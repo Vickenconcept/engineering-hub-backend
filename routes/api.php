@@ -58,6 +58,7 @@ Route::middleware(['auth:sanctum', 'throttle:60,1'])->group(function () {
         
         // Projects
         Route::apiResource('projects', App\Http\Controllers\Company\ProjectController::class)->except(['update', 'destroy']);
+        Route::post('projects/{id}/milestones', [App\Http\Controllers\Company\ProjectController::class, 'createMilestones']);
         
         // Milestones
         Route::post('milestones/{id}/submit', [App\Http\Controllers\Company\MilestoneController::class, 'submit']);

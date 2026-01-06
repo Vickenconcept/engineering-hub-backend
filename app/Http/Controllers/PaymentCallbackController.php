@@ -9,6 +9,7 @@ use App\Models\Escrow;
 use App\Services\AuditLogService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Redirect;
 
 class PaymentCallbackController extends Controller
 {
@@ -25,7 +26,7 @@ class PaymentCallbackController extends Controller
             Log::warning('Payment callback received without reference', [
                 'query' => $request->query(),
             ]);
-            return redirect("{$frontendUrl}/payment/callback?error=no_reference");
+            return Redirect::to("{$frontendUrl}/payment/callback?error=no_reference");
         }
 
         $paymentService = app(PaymentServiceInterface::class);
@@ -39,21 +40,39 @@ class PaymentCallbackController extends Controller
                 $metadata = $paymentData['metadata'] ?? [];
                 $type = $metadata['type'] ?? null;
 
+                $consultationId = null;
+                $milestoneId = null;
+                $projectId = null;
+
                 if ($type === 'consultation') {
-                    $this->handleConsultationPayment($paymentData);
+                    $consultationId = $this->handleConsultationPayment($paymentData);
                 } elseif ($type === 'milestone_escrow') {
-                    $this->handleMilestoneEscrowPayment($paymentData);
+                    $result = $this->handleMilestoneEscrowPayment($paymentData);
+                    $milestoneId = $result['milestone_id'] ?? null;
+                    $projectId = $result['project_id'] ?? null;
+                }
+
+                // Build redirect URL with relevant IDs
+                $redirectUrl = "{$frontendUrl}/payment/callback?reference={$reference}&status=success";
+                if ($consultationId) {
+                    $redirectUrl .= "&consultation_id={$consultationId}";
+                }
+                if ($milestoneId) {
+                    $redirectUrl .= "&milestone_id={$milestoneId}";
+                }
+                if ($projectId) {
+                    $redirectUrl .= "&project_id={$projectId}";
                 }
 
                 // Redirect to frontend with success
-                return redirect("{$frontendUrl}/payment/callback?reference={$reference}&status=success");
+                return Redirect::to($redirectUrl);
             } else {
                 // Payment failed
                 Log::warning('Payment verification failed', [
                     'reference' => $reference,
                     'status' => $paymentData['status'] ?? 'unknown',
                 ]);
-                return redirect("{$frontendUrl}/payment/callback?reference={$reference}&status=failed");
+                return Redirect::to("{$frontendUrl}/payment/callback?reference={$reference}&status=failed");
             }
         } catch (\Exception $e) {
             Log::error('Payment callback error', [
@@ -63,14 +82,15 @@ class PaymentCallbackController extends Controller
             ]);
 
             // Redirect to frontend with error
-            return redirect("{$frontendUrl}/payment/callback?reference={$reference}&status=error&message=" . urlencode($e->getMessage()));
+            return Redirect::to("{$frontendUrl}/payment/callback?reference={$reference}&status=error&message=" . urlencode($e->getMessage()));
         }
     }
 
     /**
      * Handle consultation payment verification
+     * @return int|null Returns consultation_id if successful
      */
-    protected function handleConsultationPayment(array $paymentData): void
+    protected function handleConsultationPayment(array $paymentData): ?int
     {
         $metadata = $paymentData['metadata'] ?? [];
         $consultationId = $metadata['consultation_id'] ?? null;
@@ -79,7 +99,7 @@ class PaymentCallbackController extends Controller
             Log::warning('Consultation payment without consultation_id in metadata', [
                 'metadata' => $metadata,
             ]);
-            return;
+            return null;
         }
 
         $consultation = Consultation::find($consultationId);
@@ -87,7 +107,7 @@ class PaymentCallbackController extends Controller
             Log::warning('Consultation not found for payment', [
                 'consultation_id' => $consultationId,
             ]);
-            return;
+            return null;
         }
 
         // Only update if not already paid
@@ -107,12 +127,15 @@ class PaymentCallbackController extends Controller
                 'reference' => $paymentData['reference'],
             ]);
         }
+
+        return $consultationId;
     }
 
     /**
      * Handle milestone escrow payment verification
+     * @return array Returns ['milestone_id' => int, 'project_id' => int] if successful
      */
-    protected function handleMilestoneEscrowPayment(array $paymentData): void
+    protected function handleMilestoneEscrowPayment(array $paymentData): array
     {
         $metadata = $paymentData['metadata'] ?? [];
         $milestoneId = $metadata['milestone_id'] ?? null;
@@ -121,15 +144,15 @@ class PaymentCallbackController extends Controller
             Log::warning('Milestone escrow payment without milestone_id in metadata', [
                 'metadata' => $metadata,
             ]);
-            return;
+            return [];
         }
 
-        $milestone = Milestone::find($milestoneId);
+        $milestone = Milestone::with('project')->find($milestoneId);
         if (!$milestone) {
             Log::warning('Milestone not found for payment', [
                 'milestone_id' => $milestoneId,
             ]);
-            return;
+            return [];
         }
 
         // Check if escrow already exists
@@ -142,7 +165,10 @@ class PaymentCallbackController extends Controller
                 'milestone_id' => $milestoneId,
                 'reference' => $paymentData['reference'],
             ]);
-            return;
+            return [
+                'milestone_id' => $milestone->id,
+                'project_id' => $milestone->project_id,
+            ];
         }
 
         // Create escrow record
@@ -169,6 +195,11 @@ class PaymentCallbackController extends Controller
             'escrow_id' => $escrow->id,
             'reference' => $paymentData['reference'],
         ]);
+
+        return [
+            'milestone_id' => $milestone->id,
+            'project_id' => $milestone->project_id,
+        ];
     }
 }
 
