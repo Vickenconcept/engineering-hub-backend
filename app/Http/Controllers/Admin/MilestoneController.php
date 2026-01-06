@@ -12,6 +12,29 @@ use Illuminate\Http\Request;
 class MilestoneController extends Controller
 {
     /**
+     * List milestones with escrow funds
+     */
+    public function index(Request $request): JsonResponse
+    {
+        $perPage = $request->input('per_page', 15);
+        $status = $request->input('status', 'held'); // held, released, all
+        
+        $query = Milestone::with(['project', 'escrow', 'project.company', 'project.client'])
+            ->whereHas('escrow');
+        
+        if ($status !== 'all') {
+            $query->whereHas('escrow', function ($q) use ($status) {
+                $q->where('status', $status);
+            });
+        }
+        
+        $milestones = $query->orderBy('created_at', 'desc')
+            ->paginate($perPage);
+        
+        return $this->successResponse($milestones, 'Milestones with escrow retrieved successfully.');
+    }
+    
+    /**
      * Release escrow funds for a milestone
      */
     public function release(Request $request, int $id): JsonResponse

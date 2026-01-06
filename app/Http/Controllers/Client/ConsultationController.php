@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\Consultation\CreateConsultationRequest;
 use App\Models\Consultation;
 use App\Models\Company;
+use App\Services\Payment\PaymentServiceInterface;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -95,7 +96,7 @@ class ConsultationController extends Controller
                     'email' => $user->email,
                     'consultation_id' => $consultation->id,
                     'type' => 'consultation',
-                    'callback_url' => config('app.url') . '/api/payments/verify',
+                    'callback_url' => config('app.url') . '/payment/callback',
                 ]
             );
 

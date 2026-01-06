@@ -28,6 +28,10 @@ Route::middleware(['auth:sanctum', 'throttle:60,1'])->group(function () {
 
     // Client routes
     Route::middleware('role:client')->prefix('client')->group(function () {
+        // Companies (browse verified companies)
+        Route::get('companies', [App\Http\Controllers\Client\CompanyController::class, 'index']);
+        Route::get('companies/{id}', [App\Http\Controllers\Client\CompanyController::class, 'show']);
+        
         // Consultations
         Route::apiResource('consultations', App\Http\Controllers\Client\ConsultationController::class)->except(['update', 'destroy']);
         Route::post('consultations/{id}/pay', [App\Http\Controllers\Client\ConsultationController::class, 'pay']);
@@ -70,6 +74,7 @@ Route::middleware(['auth:sanctum', 'throttle:60,1'])->group(function () {
         Route::post('companies/{id}/suspend', [App\Http\Controllers\Admin\CompanyController::class, 'suspend']);
         
         // Milestones
+        Route::get('milestones', [App\Http\Controllers\Admin\MilestoneController::class, 'index']);
         Route::post('milestones/{id}/release', [App\Http\Controllers\Admin\MilestoneController::class, 'release']);
         
         // Disputes

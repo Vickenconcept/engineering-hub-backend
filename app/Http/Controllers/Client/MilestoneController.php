@@ -52,7 +52,7 @@ class MilestoneController extends Controller
                     'milestone_id' => $milestone->id,
                     'project_id' => $milestone->project_id,
                     'type' => 'milestone_escrow',
-                    'callback_url' => config('app.url') . '/api/payments/verify',
+                    'callback_url' => config('app.url') . '/payment/callback',
                 ]
             );
 
