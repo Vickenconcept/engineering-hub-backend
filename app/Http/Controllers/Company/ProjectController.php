@@ -57,7 +57,7 @@ class ProjectController extends Controller
     /**
      * Create milestones for a project
      */
-    public function createMilestones(Request $request, int $id): JsonResponse
+    public function createMilestones(\App\Http\Requests\Milestone\CreateMilestoneRequest $request, int $id): JsonResponse
     {
         $user = $request->user();
         $company = $user->company;
@@ -73,19 +73,7 @@ class ProjectController extends Controller
             return $this->errorResponse('Can only add milestones to draft projects', 400);
         }
 
-        $validated = $request->validate([
-            'milestones' => ['required', 'array', 'min:1'],
-            'milestones.*.title' => ['required', 'string', 'max:255'],
-            'milestones.*.description' => ['nullable', 'string'],
-            'milestones.*.amount' => ['required', 'numeric', 'min:0'],
-            'milestones.*.sequence_order' => ['required', 'integer', 'min:1'],
-        ]);
-
-        // Validate sequence orders are unique and sequential
-        $sequenceOrders = collect($validated['milestones'])->pluck('sequence_order')->sort()->values();
-        if ($sequenceOrders->unique()->count() !== $sequenceOrders->count()) {
-            return $this->validationErrorResponse(['milestones' => ['Sequence orders must be unique']]);
-        }
+        $validated = $request->validated();
 
         $milestones = [];
         foreach ($validated['milestones'] as $milestoneData) {

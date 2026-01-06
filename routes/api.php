@@ -2,14 +2,24 @@
 
 use Illuminate\Support\Facades\Route;
 
-// Public routes
-Route::prefix('auth')->group(function () {
-    Route::post('/register', [App\Http\Controllers\Auth\AuthController::class, 'register']);
-    Route::post('/login', [App\Http\Controllers\Auth\AuthController::class, 'login']);
+// Public routes with rate limiting
+Route::middleware('throttle:10,1')->group(function () {
+    Route::prefix('auth')->group(function () {
+        Route::post('/register', [App\Http\Controllers\Auth\AuthController::class, 'register']);
+        Route::post('/login', [App\Http\Controllers\Auth\AuthController::class, 'login']);
+    });
 });
 
-// Protected routes
-Route::middleware('auth:sanctum')->group(function () {
+// Payment routes
+Route::post('/payments/webhook', [App\Http\Controllers\PaymentController::class, 'handleWebhook'])
+    ->middleware('throttle:100,1'); // Higher limit for webhooks
+
+Route::middleware(['auth:sanctum', 'throttle:30,1'])->group(function () {
+    Route::post('/payments/verify', [App\Http\Controllers\PaymentController::class, 'verifyPayment']);
+});
+
+// Protected routes with rate limiting
+Route::middleware(['auth:sanctum', 'throttle:60,1'])->group(function () {
     // Auth
     Route::prefix('auth')->group(function () {
         Route::post('/logout', [App\Http\Controllers\Auth\AuthController::class, 'logout']);
@@ -26,6 +36,7 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::apiResource('projects', App\Http\Controllers\Client\ProjectController::class)->except(['update', 'destroy']);
         
         // Milestones
+        Route::post('milestones/{id}/fund', [App\Http\Controllers\Client\MilestoneController::class, 'fundEscrow']);
         Route::post('milestones/{id}/approve', [App\Http\Controllers\Client\MilestoneController::class, 'approve']);
         Route::post('milestones/{id}/reject', [App\Http\Controllers\Client\MilestoneController::class, 'reject']);
     });
@@ -39,12 +50,12 @@ Route::middleware('auth:sanctum')->group(function () {
         
         // Consultations
         Route::apiResource('consultations', App\Http\Controllers\Company\ConsultationController::class)->except(['update', 'destroy']);
+        Route::post('consultations/{id}/complete', [App\Http\Controllers\Company\ConsultationController::class, 'complete']);
         
         // Projects
         Route::apiResource('projects', App\Http\Controllers\Company\ProjectController::class)->except(['update', 'destroy']);
         
         // Milestones
-        Route::post('milestones/{id}/fund', [App\Http\Controllers\Company\MilestoneController::class, 'fund']);
         Route::post('milestones/{id}/submit', [App\Http\Controllers\Company\MilestoneController::class, 'submit']);
         Route::post('milestones/{id}/evidence', [App\Http\Controllers\Company\MilestoneController::class, 'uploadEvidence']);
     });

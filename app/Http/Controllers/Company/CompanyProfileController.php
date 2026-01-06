@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Company;
 
 use App\Http\Controllers\Controller;
+use App\Http\Requests\Company\CreateCompanyProfileRequest;
 use App\Models\Company;
 use App\Services\AuditLogService;
 use Illuminate\Http\JsonResponse;
@@ -32,7 +33,7 @@ class CompanyProfileController extends Controller
     /**
      * Create company profile
      */
-    public function store(Request $request): JsonResponse
+    public function store(CreateCompanyProfileRequest $request): JsonResponse
     {
         $user = $request->user();
 
@@ -41,16 +42,7 @@ class CompanyProfileController extends Controller
             return $this->errorResponse('Company profile already exists. Use update instead.', 400);
         }
 
-        $validated = $request->validate([
-            'company_name' => ['required', 'string', 'max:255'],
-            'registration_number' => ['required', 'string', 'unique:companies,registration_number'],
-            'license_documents' => ['nullable', 'array'],
-            'license_documents.*' => ['file', 'mimes:pdf,jpg,jpeg,png', 'max:5120'], // 5MB max
-            'portfolio_links' => ['nullable', 'array'],
-            'portfolio_links.*' => ['url'],
-            'specialization' => ['nullable', 'array'],
-            'specialization.*' => ['string', 'max:100'],
-        ]);
+        $validated = $request->validated();
 
         // Handle file uploads
         $licenseDocuments = [];

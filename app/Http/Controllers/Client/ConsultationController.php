@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Client;
 
 use App\Http\Controllers\Controller;
+use App\Http\Requests\Consultation\CreateConsultationRequest;
 use App\Models\Consultation;
 use App\Models\Company;
 use Illuminate\Http\JsonResponse;
@@ -43,14 +44,9 @@ class ConsultationController extends Controller
     /**
      * Create a new consultation booking
      */
-    public function store(Request $request): JsonResponse
+    public function store(CreateConsultationRequest $request): JsonResponse
     {
-        $validated = $request->validate([
-            'company_id' => ['required', 'exists:companies,id'],
-            'scheduled_at' => ['required', 'date', 'after:now'],
-            'duration_minutes' => ['nullable', 'integer', 'min:15', 'max:120'],
-            'price' => ['required', 'numeric', 'min:0'],
-        ]);
+        $validated = $request->validated();
 
         // Verify company is approved
         $company = Company::findOrFail($validated['company_id']);
@@ -75,7 +71,7 @@ class ConsultationController extends Controller
     }
 
     /**
-     * Pay for a consultation
+     * Initialize payment for a consultation
      */
     public function pay(Request $request, int $id): JsonResponse
     {
@@ -88,27 +84,28 @@ class ConsultationController extends Controller
             return $this->errorResponse('Consultation is already paid', 400);
         }
 
-        $validated = $request->validate([
-            'payment_reference' => ['required', 'string'],
-            'payment_provider' => ['required', 'in:stripe,paystack'],
-        ]);
+        $paymentService = app(PaymentServiceInterface::class);
 
-        // TODO: Verify payment with payment provider
-        // For now, we'll just mark it as paid
-        // In production, verify the payment reference with the provider first
+        try {
+            // Initialize payment
+            $paymentData = $paymentService->initializePayment(
+                amount: (float) $consultation->price,
+                currency: 'NGN',
+                metadata: [
+                    'email' => $user->email,
+                    'consultation_id' => $consultation->id,
+                    'type' => 'consultation',
+                    'callback_url' => config('app.url') . '/api/payments/verify',
+                ]
+            );
 
-        $consultation->update([
-            'payment_status' => Consultation::PAYMENT_STATUS_PAID,
-        ]);
-
-        // Generate meeting link (placeholder - integrate with video service)
-        $consultation->update([
-            'meeting_link' => 'https://meet.example.com/' . $consultation->id,
-        ]);
-
-        return $this->successResponse(
-            $consultation->load(['company.user', 'company']),
-            'Payment successful. Consultation confirmed.'
-        );
+            return $this->successResponse([
+                'payment_url' => $paymentData['authorization_url'],
+                'reference' => $paymentData['reference'],
+                'consultation' => $consultation,
+            ], 'Payment initialized. Redirect to payment_url to complete payment.');
+        } catch (\Exception $e) {
+            return $this->errorResponse('Failed to initialize payment: ' . $e->getMessage(), 500);
+        }
     }
 }

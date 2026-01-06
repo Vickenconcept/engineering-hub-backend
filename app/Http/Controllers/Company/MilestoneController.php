@@ -12,50 +12,6 @@ use Illuminate\Support\Facades\Storage;
 
 class MilestoneController extends Controller
 {
-    /**
-     * Fund a milestone (mark as ready for payment - client will initiate payment)
-     */
-    public function fund(Request $request, int $id): JsonResponse
-    {
-        $user = $request->user();
-        $company = $user->company;
-        
-        if (!$company) {
-            return $this->errorResponse('Company profile not found', 404);
-        }
-
-        $milestone = Milestone::whereHas('project', function ($query) use ($company) {
-            $query->where('company_id', $company->id);
-        })->with('project')->findOrFail($id);
-
-        if ($milestone->status !== Milestone::STATUS_PENDING) {
-            return $this->errorResponse('Only pending milestones can be funded', 400);
-        }
-
-        // Check if previous milestone is completed
-        if (!$milestone->previousMilestoneCompleted()) {
-            return $this->errorResponse('Previous milestone must be completed before funding this one', 400);
-        }
-
-        // Check if project has active disputes
-        if ($milestone->project->hasActiveDispute()) {
-            return $this->errorResponse('Cannot fund milestone while project has active disputes', 400);
-        }
-
-        $milestone->update([
-            'status' => Milestone::STATUS_FUNDED,
-        ]);
-
-        // Log audit action
-        app(AuditLogService::class)->logMilestoneAction('funded', $milestone->id, [
-            'amount' => $milestone->amount,
-        ]);
-
-        return $this->successResponse(
-            $milestone->load(['project']),
-            'Milestone marked as ready for funding. Client can now deposit funds to escrow.'
-        );
-    }
 
     /**
      * Submit milestone for approval (after completion)

@@ -11,6 +11,62 @@ use Illuminate\Http\Request;
 class MilestoneController extends Controller
 {
     /**
+     * Fund milestone escrow (deposit payment)
+     */
+    public function fundEscrow(Request $request, int $id): JsonResponse
+    {
+        $user = $request->user();
+        
+        $milestone = Milestone::whereHas('project', function ($query) use ($user) {
+            $query->where('client_id', $user->id);
+        })->with(['project', 'escrow'])->findOrFail($id);
+
+        if ($milestone->status !== Milestone::STATUS_PENDING) {
+            return $this->errorResponse('Only pending milestones can be funded', 400);
+        }
+
+        // Check if escrow already exists
+        if ($milestone->escrow) {
+            return $this->errorResponse('Escrow already funded for this milestone', 400);
+        }
+
+        // Check if previous milestone is completed
+        if (!$milestone->previousMilestoneCompleted()) {
+            return $this->errorResponse('Previous milestone must be completed before funding this one', 400);
+        }
+
+        // Check if project has active disputes
+        if ($milestone->project->hasActiveDispute()) {
+            return $this->errorResponse('Cannot fund milestone while project has active disputes', 400);
+        }
+
+        $paymentService = app(\App\Services\Payment\PaymentServiceInterface::class);
+
+        try {
+            // Initialize payment for escrow
+            $paymentData = $paymentService->initializePayment(
+                amount: (float) $milestone->amount,
+                currency: 'NGN',
+                metadata: [
+                    'email' => $user->email,
+                    'milestone_id' => $milestone->id,
+                    'project_id' => $milestone->project_id,
+                    'type' => 'milestone_escrow',
+                    'callback_url' => config('app.url') . '/api/payments/verify',
+                ]
+            );
+
+            return $this->successResponse([
+                'payment_url' => $paymentData['authorization_url'],
+                'reference' => $paymentData['reference'],
+                'milestone' => $milestone,
+            ], 'Payment initialized. Redirect to payment_url to fund escrow.');
+        } catch (\Exception $e) {
+            return $this->errorResponse('Failed to initialize payment: ' . $e->getMessage(), 500);
+        }
+    }
+
+    /**
      * Approve a milestone
      */
     public function approve(Request $request, int $id): JsonResponse

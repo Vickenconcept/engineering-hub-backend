@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Client;
 
 use App\Http\Controllers\Controller;
+use App\Http\Requests\Project\CreateProjectRequest;
 use App\Models\Project;
 use App\Models\Consultation;
 use Illuminate\Http\JsonResponse;
@@ -48,16 +49,9 @@ class ProjectController extends Controller
     /**
      * Create a new project from consultation
      */
-    public function store(Request $request): JsonResponse
+    public function store(CreateProjectRequest $request): JsonResponse
     {
-        $validated = $request->validate([
-            'consultation_id' => ['required', 'exists:consultations,id'],
-            'title' => ['required', 'string', 'max:255'],
-            'description' => ['nullable', 'string'],
-            'location' => ['required', 'string', 'max:255'],
-            'budget_min' => ['nullable', 'numeric', 'min:0'],
-            'budget_max' => ['nullable', 'numeric', 'min:0', 'gte:budget_min'],
-        ]);
+        $validated = $request->validated();
 
         $user = $request->user();
         

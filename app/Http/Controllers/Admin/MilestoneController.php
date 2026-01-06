@@ -18,9 +18,13 @@ class MilestoneController extends Controller
     {
         $validated = $request->validate([
             'override' => ['nullable', 'boolean'], // Admin override even without client approval
+            'recipient_account' => ['required', 'array'],
+            'recipient_account.account_number' => ['required', 'string'],
+            'recipient_account.bank_code' => ['required', 'string'],
+            'recipient_account.name' => ['required', 'string'],
         ]);
 
-        $milestone = Milestone::with(['project', 'escrow'])->findOrFail($id);
+        $milestone = Milestone::with(['project', 'escrow', 'project.company'])->findOrFail($id);
 
         if (!$milestone->escrow) {
             return $this->errorResponse('No escrow found for this milestone', 400);
@@ -38,26 +42,41 @@ class MilestoneController extends Controller
             );
         }
 
-        // TODO: Implement actual payment release through payment provider
-        // For now, we'll just mark it as released
-        $milestone->escrow->update([
-            'status' => Escrow::STATUS_RELEASED,
-        ]);
+        $paymentService = app(\App\Services\Payment\PaymentServiceInterface::class);
 
-        $milestone->update([
-            'status' => Milestone::STATUS_RELEASED,
-        ]);
+        try {
+            // Release funds to company account
+            $releaseData = $paymentService->releaseFunds(
+                reference: $milestone->escrow->payment_reference,
+                recipientAccount: $validated['recipient_account']
+            );
 
-        // Log audit action
-        app(AuditLogService::class)->logEscrowAction('released', $milestone->escrow->id, [
-            'released_by' => auth()->id(),
-            'amount' => $milestone->escrow->amount,
-            'admin_override' => $validated['override'] ?? false,
-        ]);
+            // Update escrow and milestone status
+            $milestone->escrow->update([
+                'status' => Escrow::STATUS_RELEASED,
+            ]);
 
-        return $this->successResponse(
-            $milestone->load(['project', 'escrow']),
-            'Escrow funds released successfully.'
-        );
+            $milestone->update([
+                'status' => Milestone::STATUS_RELEASED,
+            ]);
+
+            // Log audit action
+            app(AuditLogService::class)->logEscrowAction('released', $milestone->escrow->id, [
+                'released_by' => auth()->id(),
+                'amount' => $milestone->escrow->amount,
+                'admin_override' => $validated['override'] ?? false,
+                'transfer_reference' => $releaseData['transfer_reference'] ?? null,
+            ]);
+
+            return $this->successResponse(
+                [
+                    'milestone' => $milestone->load(['project', 'escrow']),
+                    'transfer' => $releaseData,
+                ],
+                'Escrow funds released successfully.'
+            );
+        } catch (\Exception $e) {
+            return $this->errorResponse('Failed to release funds: ' . $e->getMessage(), 500);
+        }
     }
 }
