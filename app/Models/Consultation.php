@@ -64,6 +64,7 @@ class Consultation extends Model
         'platform_fee_percentage',
         'payment_status',
         'meeting_link',
+        'calendar_event_id',
         'status',
     ];
 

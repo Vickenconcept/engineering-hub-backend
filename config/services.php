@@ -41,4 +41,10 @@ return [
         'base_url' => env('PAYSTACK_BASE_URL', 'https://api.paystack.co'),
     ],
 
+    'google' => [
+        'credentials_path' => env('GOOGLE_APPLICATION_CREDENTIALS', 'storage/app/google/google-credentials.json'),
+        'credentials_json' => env('GOOGLE_APPLICATION_CREDENTIALS_JSON'),
+        'calendar_id' => env('GOOGLE_CALENDAR_ID', 'primary'),
+    ],
+
 ];

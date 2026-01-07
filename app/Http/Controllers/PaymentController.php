@@ -243,12 +243,12 @@ class PaymentController extends Controller
             }
 
             // Update consultation status - this is the source of truth
+            // Note: Google Meet link generation is handled in PaymentCallbackController
             $consultation->update([
                 'payment_status' => Consultation::PAYMENT_STATUS_PAID,
                 'platform_fee' => $platformFee,
                 'net_amount' => $netAmount,
                 'platform_fee_percentage' => $platformFeePercentage,
-                'meeting_link' => 'https://meet.example.com/' . $consultation->id, // TODO: Generate actual meeting link
             ]);
 
             // Log the payment - this happens within transaction

@@ -9,6 +9,7 @@ use App\Models\Escrow;
 use App\Models\PaymentAccount;
 use App\Models\User;
 use App\Services\AuditLogService;
+use App\Services\VideoMeeting\GoogleMeetService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
@@ -118,7 +119,10 @@ class PaymentCallbackController extends Controller
         // Use database transaction for atomicity
         DB::transaction(function () use ($paymentData, $consultationId) {
             // Lock the consultation record to prevent race conditions
-            $consultation = Consultation::lockForUpdate()->find($consultationId);
+            // Eager load relationships needed for meeting generation
+            $consultation = Consultation::with(['client', 'company.user'])
+                ->lockForUpdate()
+                ->find($consultationId);
             
             if (!$consultation) {
                 Log::warning('Consultation not found for payment', [
@@ -284,13 +288,92 @@ class PaymentCallbackController extends Controller
                 }
             }
 
+            // Generate Google Meet link
+            $meetingLink = null;
+            $calendarEventId = null;
+            
+            Log::info('Attempting to generate Google Meet link', [
+                'consultation_id' => $consultation->id,
+            ]);
+            
+            try {
+                // Get client and company emails (relationships already loaded)
+                $client = $consultation->client;
+                $company = $consultation->company;
+                
+                Log::info('Consultation relationships loaded', [
+                    'consultation_id' => $consultation->id,
+                    'has_client' => !!$client,
+                    'has_company' => !!$company,
+                    'has_company_user' => !!($company && $company->user),
+                    'client_email' => $client?->email,
+                    'company_user_email' => $company?->user?->email,
+                ]);
+                
+                if ($client && $company && $company->user) {
+                    Log::info('Initializing GoogleMeetService', [
+                        'consultation_id' => $consultation->id,
+                    ]);
+                    
+                    $googleMeetService = app(GoogleMeetService::class);
+                    
+                    Log::info('Calling createMeeting', [
+                        'consultation_id' => $consultation->id,
+                        'scheduled_at' => $consultation->scheduled_at->toIso8601String(),
+                        'duration_minutes' => $consultation->duration_minutes ?? 30,
+                        'client_email' => $client->email,
+                        'company_email' => $company->user->email,
+                    ]);
+                    
+                    $meetingData = $googleMeetService->createMeeting(
+                        consultationId: $consultation->id,
+                        startTime: $consultation->scheduled_at,
+                        durationMinutes: $consultation->duration_minutes ?? 30,
+                        clientEmail: $client->email,
+                        companyEmail: $company->user->email,
+                        title: "Consultation: {$company->company_name}",
+                        description: "Consultation meeting between {$client->name} and {$company->company_name}"
+                    );
+                    
+                    $meetingLink = $meetingData['meeting_link'];
+                    $calendarEventId = $meetingData['calendar_event_id'];
+                    
+                    Log::info('Google Meet link generated successfully', [
+                        'consultation_id' => $consultation->id,
+                        'meeting_link' => $meetingLink,
+                        'calendar_event_id' => $calendarEventId,
+                    ]);
+                } else {
+                    Log::warning('Cannot generate meeting link - missing client or company email', [
+                        'consultation_id' => $consultation->id,
+                        'has_client' => !!$client,
+                        'has_company' => !!$company,
+                        'has_company_user' => !!($company && $company->user),
+                        'client_id' => $consultation->client_id,
+                        'company_id' => $consultation->company_id,
+                    ]);
+                }
+            } catch (\Exception $e) {
+                // Don't fail the payment if meeting link generation fails
+                Log::error('Failed to generate Google Meet link for consultation', [
+                    'consultation_id' => $consultation->id,
+                    'error' => $e->getMessage(),
+                    'error_class' => get_class($e),
+                    'file' => $e->getFile(),
+                    'line' => $e->getLine(),
+                    'trace' => $e->getTraceAsString(),
+                ]);
+                // Continue without meeting link - can be generated later
+            }
+
             // Update consultation status - this is the source of truth
             $consultation->update([
                 'payment_status' => Consultation::PAYMENT_STATUS_PAID,
                 'platform_fee' => $platformFee,
                 'net_amount' => $netAmount,
                 'platform_fee_percentage' => $platformFeePercentage,
-                'meeting_link' => 'https://meet.example.com/' . $consultation->id, // TODO: Generate actual meeting link
+                'meeting_link' => $meetingLink,
+                'calendar_event_id' => $calendarEventId,
             ]);
 
             // Log the payment - this happens within transaction
