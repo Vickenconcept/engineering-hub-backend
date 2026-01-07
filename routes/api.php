@@ -36,11 +36,23 @@ Route::middleware(['auth:sanctum', 'throttle:60,1'])->group(function () {
         Route::get('companies/{id}', [App\Http\Controllers\Client\CompanyController::class, 'show']);
         
         // Consultations
-        Route::apiResource('consultations', App\Http\Controllers\Client\ConsultationController::class)->except(['update', 'destroy']);
+        Route::apiResource('consultations', App\Http\Controllers\Client\ConsultationController::class)
+            ->except(['update', 'destroy'])
+            ->names([
+                'index' => 'client.consultations.index',
+                'store' => 'client.consultations.store',
+                'show' => 'client.consultations.show',
+            ]);
         Route::post('consultations/{id}/pay', [App\Http\Controllers\Client\ConsultationController::class, 'pay']);
         
         // Projects
-        Route::apiResource('projects', App\Http\Controllers\Client\ProjectController::class)->except(['update', 'destroy']);
+        Route::apiResource('projects', App\Http\Controllers\Client\ProjectController::class)
+            ->except(['update', 'destroy'])
+            ->names([
+                'index' => 'client.projects.index',
+                'store' => 'client.projects.store',
+                'show' => 'client.projects.show',
+            ]);
         
         // Milestones
         Route::post('milestones/{id}/fund', [App\Http\Controllers\Client\MilestoneController::class, 'fundEscrow']);
@@ -59,11 +71,23 @@ Route::middleware(['auth:sanctum', 'throttle:60,1'])->group(function () {
         Route::post('profile/update', [App\Http\Controllers\Company\CompanyProfileController::class, 'update']); // For FormData updates
         
         // Consultations
-        Route::apiResource('consultations', App\Http\Controllers\Company\ConsultationController::class)->except(['update', 'destroy']);
+        Route::apiResource('consultations', App\Http\Controllers\Company\ConsultationController::class)
+            ->except(['update', 'destroy'])
+            ->names([
+                'index' => 'company.consultations.index',
+                'store' => 'company.consultations.store',
+                'show' => 'company.consultations.show',
+            ]);
         Route::post('consultations/{id}/complete', [App\Http\Controllers\Company\ConsultationController::class, 'complete']);
         
         // Projects
-        Route::apiResource('projects', App\Http\Controllers\Company\ProjectController::class)->except(['update', 'destroy']);
+        Route::apiResource('projects', App\Http\Controllers\Company\ProjectController::class)
+            ->except(['update', 'destroy'])
+            ->names([
+                'index' => 'company.projects.index',
+                'store' => 'company.projects.store',
+                'show' => 'company.projects.show',
+            ]);
         Route::post('projects/{id}/milestones', [App\Http\Controllers\Company\ProjectController::class, 'createMilestones']);
         
         // Milestones
