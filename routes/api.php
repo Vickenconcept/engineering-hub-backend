@@ -51,6 +51,7 @@ Route::middleware(['auth:sanctum', 'throttle:60,1'])->group(function () {
         Route::get('profile', [App\Http\Controllers\Company\CompanyProfileController::class, 'show']);
         Route::post('profile', [App\Http\Controllers\Company\CompanyProfileController::class, 'store']);
         Route::put('profile', [App\Http\Controllers\Company\CompanyProfileController::class, 'update']);
+        Route::post('profile/update', [App\Http\Controllers\Company\CompanyProfileController::class, 'update']); // For FormData updates
         
         // Consultations
         Route::apiResource('consultations', App\Http\Controllers\Company\ConsultationController::class)->except(['update', 'destroy']);
@@ -86,6 +87,38 @@ Route::middleware(['auth:sanctum', 'throttle:60,1'])->group(function () {
         // Audit logs
         Route::get('audit-logs', [App\Http\Controllers\Admin\AuditLogController::class, 'index']);
     });
+
+    // Payment accounts (all authenticated users)
+    Route::prefix('payment-accounts')->group(function () {
+        Route::get('/', [App\Http\Controllers\PaymentAccountController::class, 'index']);
+        Route::post('/', [App\Http\Controllers\PaymentAccountController::class, 'store']);
+        Route::put('{id}', [App\Http\Controllers\PaymentAccountController::class, 'update']);
+        Route::delete('{id}', [App\Http\Controllers\PaymentAccountController::class, 'destroy']);
+        Route::post('{id}/set-default', [App\Http\Controllers\PaymentAccountController::class, 'setDefault']);
+        Route::get('/banks', [App\Http\Controllers\PaymentAccountController::class, 'getBanks']);
+        Route::post('/verify', [App\Http\Controllers\PaymentAccountController::class, 'verifyAccount']);
+    });
+
+    // Admin: Get payment accounts for a user
+    Route::middleware('role:admin')->prefix('admin')->group(function () {
+        Route::get('users/{userId}/payment-accounts', [App\Http\Controllers\PaymentAccountController::class, 'getUserAccounts']);
+    });
+
+    // Escrow operations
+    Route::prefix('escrow')->group(function () {
+        // Company: Request escrow release
+        Route::middleware('role:company')->post('milestones/{id}/release', [
+            App\Http\Controllers\PaymentAccountController::class, 'requestEscrowRelease'
+        ]);
+        
+        // Client: Request escrow refund
+        Route::middleware('role:client')->post('milestones/{id}/refund', [
+            App\Http\Controllers\PaymentAccountController::class, 'requestEscrowRefund'
+        ]);
+    });
+
+    // Transactions (all authenticated users)
+    Route::get('/transactions', [App\Http\Controllers\TransactionController::class, 'index']);
 
     // Shared routes (all authenticated users)
     Route::prefix('projects')->group(function () {

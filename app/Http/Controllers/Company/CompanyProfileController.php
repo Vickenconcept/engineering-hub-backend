@@ -8,6 +8,7 @@ use App\Models\Company;
 use App\Services\AuditLogService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
 
 class CompanyProfileController extends Controller
@@ -83,9 +84,49 @@ class CompanyProfileController extends Controller
         
         $company = Company::where('user_id', $user->id)->firstOrFail();
 
-        // Cannot update if approved (requires admin approval for changes)
-        if ($company->isApproved()) {
-            return $this->errorResponse('Cannot update approved profile. Contact admin for changes.', 403);
+        // Log incoming request data for debugging
+        Log::info('Company Profile Update Request', [
+            'user_id' => $user->id,
+            'company_id' => $company->id,
+            'all_request_data' => $request->all(),
+            'consultation_fee_raw' => $request->input('consultation_fee'),
+            'has_consultation_fee' => $request->has('consultation_fee'),
+        ]);
+
+        // Cannot update core profile fields if approved (requires admin approval for changes)
+        // But consultation_fee can be updated anytime as it's a business setting
+        $coreFields = ['company_name', 'registration_number', 'license_documents', 'portfolio_links', 'specialization'];
+        $requestKeys = collect($request->all())->keys()->filter(function($key) {
+            return $key !== 'consultation_fee'; // Exclude consultation_fee from core fields check
+        });
+        $hasCoreFieldUpdate = $requestKeys->intersect($coreFields)->isNotEmpty();
+        
+        // If company is approved, check if core fields are actually being CHANGED
+        if ($company->isApproved() && $hasCoreFieldUpdate) {
+            // Check if the values are actually different from current values
+            $hasActualChange = false;
+            foreach ($coreFields as $field) {
+                if ($request->has($field)) {
+                    $requestValue = $request->input($field);
+                    $currentValue = $company->$field;
+                    
+                    // Compare values (handle arrays specially)
+                    if (is_array($requestValue) && is_array($currentValue)) {
+                        if (json_encode($requestValue) !== json_encode($currentValue)) {
+                            $hasActualChange = true;
+                            break;
+                        }
+                    } elseif ($requestValue != $currentValue) {
+                        $hasActualChange = true;
+                        break;
+                    }
+                }
+            }
+            
+            if ($hasActualChange) {
+                return $this->errorResponse('Cannot update core profile fields after approval. Contact admin for changes.', 403);
+            }
+            // If no actual changes to core fields, allow the update (might be updating consultation_fee only)
         }
 
         $validated = $request->validate([
@@ -97,6 +138,12 @@ class CompanyProfileController extends Controller
             'portfolio_links.*' => ['url'],
             'specialization' => ['nullable', 'array'],
             'specialization.*' => ['string', 'max:100'],
+            'consultation_fee' => ['sometimes', 'nullable', 'numeric', 'min:0'],
+        ]);
+        
+        Log::info('After Validation', [
+            'validated_data' => $validated,
+            'consultation_fee_in_validated' => isset($validated['consultation_fee']),
         ]);
 
         // Handle file uploads
@@ -108,8 +155,28 @@ class CompanyProfileController extends Controller
             }
             $validated['license_documents'] = $licenseDocuments;
         }
+        
+        // Explicitly handle consultation_fee - ensure it's included in update even if 0
+        // Check both request input and validated array
+        if ($request->has('consultation_fee') || isset($validated['consultation_fee'])) {
+            $feeValue = $request->input('consultation_fee') ?? $validated['consultation_fee'] ?? null;
+            // Convert to float, or null if empty string
+            $validated['consultation_fee'] = ($feeValue !== null && $feeValue !== '' && $feeValue !== 'null') 
+                ? (float) $feeValue 
+                : null;
+        }
+
+        Log::info('Before Update', [
+            'validated_data' => $validated,
+            'consultation_fee_value' => $validated['consultation_fee'] ?? 'NOT SET',
+        ]);
 
         $company->update($validated);
+        $company->refresh(); // Refresh to get updated data
+        
+        Log::info('After Update', [
+            'company_consultation_fee' => $company->consultation_fee,
+        ]);
 
         // Log audit action
         app(AuditLogService::class)->logCompanyAction('updated', $company->id);

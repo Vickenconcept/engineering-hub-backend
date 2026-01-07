@@ -31,10 +31,10 @@ interface PaymentServiceInterface
      * Release funds from escrow (transfer to company)
      * 
      * @param string $reference Escrow payment reference
-     * @param string $recipientAccount Account identifier
+     * @param array $recipientAccount Account data (name, account_number, bank_code)
      * @return array Transfer result data
      */
-    public function releaseFunds(string $reference, string $recipientAccount): array;
+    public function releaseFunds(string $reference, array $recipientAccount): array;
 
     /**
      * Refund a payment

@@ -141,7 +141,7 @@ class PaystackPaymentService extends PaymentService implements PaymentServiceInt
     /**
      * Release funds from escrow (transfer to company)
      */
-    public function releaseFunds(string $reference, string $recipientAccount): array
+    public function releaseFunds(string $reference, array $recipientAccount): array
     {
         try {
             // First, verify the payment exists
@@ -305,6 +305,75 @@ class PaystackPaymentService extends PaymentService implements PaymentServiceInt
             'reversed' => 'refunded',
             default => 'pending',
         };
+    }
+
+    /**
+     * Get list of banks
+     */
+    public function getBanks(): array
+    {
+        try {
+            $response = Http::withHeaders([
+                'Authorization' => 'Bearer ' . $this->secretKey,
+                'Content-Type' => 'application/json',
+            ])->get("{$this->baseUrl}/bank");
+
+            if (!$response->successful()) {
+                $error = $response->json();
+                Log::error('Paystack get banks failed', [
+                    'error' => $error,
+                ]);
+                throw new \Exception($error['message'] ?? 'Failed to fetch banks');
+            }
+
+            $data = $response->json('data');
+            return $data ?? [];
+        } catch (\Exception $e) {
+            Log::error('Paystack get banks error', [
+                'error' => $e->getMessage(),
+            ]);
+            throw $e;
+        }
+    }
+
+    /**
+     * Resolve/verify bank account number
+     */
+    public function resolveAccount(string $accountNumber, string $bankCode): array
+    {
+        try {
+            $response = Http::withHeaders([
+                'Authorization' => 'Bearer ' . $this->secretKey,
+                'Content-Type' => 'application/json',
+            ])->get("{$this->baseUrl}/bank/resolve", [
+                'account_number' => $accountNumber,
+                'bank_code' => $bankCode,
+            ]);
+
+            if (!$response->successful()) {
+                $error = $response->json();
+                Log::error('Paystack resolve account failed', [
+                    'error' => $error,
+                    'account_number' => $accountNumber,
+                    'bank_code' => $bankCode,
+                ]);
+                throw new \Exception($error['message'] ?? 'Failed to resolve account');
+            }
+
+            $data = $response->json('data');
+            return [
+                'account_number' => $data['account_number'] ?? $accountNumber,
+                'account_name' => $data['account_name'] ?? '',
+                'bank_id' => $data['bank_id'] ?? null,
+            ];
+        } catch (\Exception $e) {
+            Log::error('Paystack resolve account error', [
+                'error' => $e->getMessage(),
+                'account_number' => $accountNumber,
+                'bank_code' => $bankCode,
+            ]);
+            throw $e;
+        }
     }
 }
 

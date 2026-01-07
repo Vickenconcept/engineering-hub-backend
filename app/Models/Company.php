@@ -55,6 +55,7 @@ class Company extends Model
         'license_documents',
         'portfolio_links',
         'specialization',
+        'consultation_fee',
         'verified_at',
         'status',
     ];
@@ -63,6 +64,7 @@ class Company extends Model
         'license_documents' => 'array',
         'portfolio_links' => 'array',
         'specialization' => 'array',
+        'consultation_fee' => 'decimal:2',
         'verified_at' => 'datetime',
     ];
 
