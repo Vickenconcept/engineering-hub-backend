@@ -58,11 +58,16 @@ class Milestone extends Model
         'amount',
         'sequence_order',
         'status',
+        'verified_at',
+        'verified_by',
+        'client_notes',
+        'company_notes',
     ];
 
     protected $casts = [
         'amount' => 'decimal:2',
         'sequence_order' => 'integer',
+        'verified_at' => 'datetime',
     ];
 
     /**
@@ -95,6 +100,22 @@ class Milestone extends Model
     public function disputes(): HasMany
     {
         return $this->hasMany(Dispute::class);
+    }
+
+    /**
+     * Relationship: Milestone verified by user (client)
+     */
+    public function verifier(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'verified_by');
+    }
+
+    /**
+     * Check if milestone is verified
+     */
+    public function isVerified(): bool
+    {
+        return $this->verified_at !== null;
     }
 
     /**

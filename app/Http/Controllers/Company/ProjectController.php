@@ -87,12 +87,12 @@ class ProjectController extends Controller
             ]);
         }
 
-        // Activate project after milestones are created
-        $project->update(['status' => Project::STATUS_ACTIVE]);
+        // Don't activate project yet - wait for client to verify all milestones
+        // Project will be activated automatically when all milestones are verified
 
         return $this->createdResponse(
             $project->load('milestones'),
-            'Milestones created successfully. Project is now active.'
+            'Milestones created successfully. The project will become active once the client verifies all milestones.'
         );
     }
 }

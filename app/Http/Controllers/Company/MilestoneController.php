@@ -56,7 +56,7 @@ class MilestoneController extends Controller
 
         return $this->successResponse(
             $milestone->load(['project', 'escrow', 'evidence']),
-            'Milestone submitted successfully. Awaiting client approval.'
+            'Milestone submitted for approval.'
         );
     }
 
@@ -113,5 +113,54 @@ class MilestoneController extends Controller
             $evidence->load(['milestone', 'uploader']),
             'Evidence uploaded successfully.'
         );
+    }
+
+    /**
+     * Add or update company notes on a milestone
+     */
+    public function updateNotes(Request $request, string $id): JsonResponse
+    {
+        $validated = $request->validate([
+            'notes' => ['required', 'string', 'max:2000'],
+        ]);
+
+        $user = $request->user();
+        $company = $user->company;
+        
+        if (!$company) {
+            return $this->errorResponse('Company profile not found', 404);
+        }
+
+        $milestone = Milestone::whereHas('project', function ($query) use ($company) {
+            $query->where('company_id', $company->id);
+        })->findOrFail($id);
+
+        $milestone->update([
+            'company_notes' => $validated['notes'],
+        ]);
+
+        return $this->successResponse(
+            $milestone->load(['project']),
+            'Notes updated successfully.'
+        );
+    }
+
+    /**
+     * Get milestone details
+     */
+    public function show(Request $request, string $id): JsonResponse
+    {
+        $user = $request->user();
+        $company = $user->company;
+        
+        if (!$company) {
+            return $this->errorResponse('Company profile not found', 404);
+        }
+
+        $milestone = Milestone::whereHas('project', function ($query) use ($company) {
+            $query->where('company_id', $company->id);
+        })->with(['project', 'escrow', 'evidence', 'verifier'])->findOrFail($id);
+
+        return $this->successResponse($milestone);
     }
 }

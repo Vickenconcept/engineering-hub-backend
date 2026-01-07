@@ -90,6 +90,16 @@ class Project extends Model
     }
 
     /**
+     * Check if all milestones are verified
+     */
+    public function allMilestonesVerified(): bool
+    {
+        return $this->milestones()
+            ->whereNull('verified_at')
+            ->doesntExist();
+    }
+
+    /**
      * Relationship: Project has many disputes
      */
     public function disputes(): HasMany

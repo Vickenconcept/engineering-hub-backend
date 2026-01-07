@@ -150,4 +150,87 @@ class MilestoneController extends Controller
             'Milestone rejected. A dispute has been created for review.'
         );
     }
+
+    /**
+     * Verify a milestone (before project becomes active)
+     */
+    public function verify(Request $request, string $id): JsonResponse
+    {
+        $validated = $request->validate([
+            'notes' => ['nullable', 'string', 'max:2000'],
+        ]);
+
+        $user = $request->user();
+        
+        $milestone = Milestone::whereHas('project', function ($query) use ($user) {
+            $query->where('client_id', $user->id)
+                  ->where('status', \App\Models\Project::STATUS_DRAFT);
+        })->with(['project'])->findOrFail($id);
+
+        if ($milestone->isVerified()) {
+            return $this->errorResponse('Milestone is already verified', 400);
+        }
+
+        // Verify the milestone
+        $milestone->update([
+            'verified_at' => now(),
+            'verified_by' => $user->id,
+            'client_notes' => $validated['notes'] ?? null,
+        ]);
+
+        // Check if all milestones are verified, then activate project
+        $project = $milestone->project;
+        $allMilestonesVerified = $project->milestones()
+            ->whereNull('verified_at')
+            ->doesntExist();
+
+        if ($allMilestonesVerified) {
+            $project->update(['status' => \App\Models\Project::STATUS_ACTIVE]);
+            
+            // Log audit action
+            app(AuditLogService::class)->logProjectAction('activated', $project->id, [
+                'activated_by' => $user->id,
+                'reason' => 'All milestones verified by client',
+            ]);
+        }
+
+        // Log audit action
+        app(AuditLogService::class)->logMilestoneAction('verified', $milestone->id, [
+            'verified_by' => $user->id,
+            'project_id' => $milestone->project_id,
+            'project_activated' => $allMilestonesVerified,
+        ]);
+
+        return $this->successResponse(
+            $milestone->load(['project', 'verifier']),
+            $allMilestonesVerified 
+                ? 'Milestone verified. All milestones are now verified. Project is now active!'
+                : 'Milestone verified successfully.'
+        );
+    }
+
+    /**
+     * Add or update client notes on a milestone
+     */
+    public function updateNotes(Request $request, string $id): JsonResponse
+    {
+        $validated = $request->validate([
+            'notes' => ['required', 'string', 'max:2000'],
+        ]);
+
+        $user = $request->user();
+        
+        $milestone = Milestone::whereHas('project', function ($query) use ($user) {
+            $query->where('client_id', $user->id);
+        })->findOrFail($id);
+
+        $milestone->update([
+            'client_notes' => $validated['notes'],
+        ]);
+
+        return $this->successResponse(
+            $milestone->load(['project']),
+            'Notes updated successfully.'
+        );
+    }
 }
