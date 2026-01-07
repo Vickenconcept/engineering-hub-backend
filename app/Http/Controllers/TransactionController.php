@@ -108,19 +108,36 @@ class TransactionController extends Controller
                         ->orderBy('created_at', 'desc')
                         ->first();
 
-                    // Show to company (they received money)
+                    // Calculate amounts
+                    $totalAmount = (float) $escrow->amount;
+                    $platformFee = (float) ($escrow->platform_fee ?? 0);
+                    $netAmount = (float) ($escrow->net_amount ?? ($totalAmount - $platformFee));
+
+                    // Get transfer references
+                    $companyTransferRef = $releaseLog && isset($releaseLog->metadata['company_transfer_reference']) 
+                        ? $releaseLog->metadata['company_transfer_reference'] 
+                        : ($releaseLog && isset($releaseLog->metadata['transfer_reference']) 
+                            ? $releaseLog->metadata['transfer_reference'] 
+                            : null);
+
+                    $platformFeeTransferRef = $releaseLog && isset($releaseLog->metadata['platform_fee_transfer_reference']) 
+                        ? $releaseLog->metadata['platform_fee_transfer_reference'] 
+                        : null;
+
+                    // COMPANY: Shows net amount they received (after platform fee)
                     if ($user->isAdmin() || ($user->isCompany() && $project->company_id === ($user->company->id ?? null))) {
                         $transactions->push([
                             'id' => $escrow->id . '_release',
                             'type' => 'escrow_release',
-                            'amount' => (float) $escrow->amount,
+                            'amount' => $netAmount,
                             'status' => 'success',
-                            'payment_reference' => $releaseLog && isset($releaseLog->metadata['transfer_reference']) 
-                                ? $releaseLog->metadata['transfer_reference'] 
-                                : ($escrow->payment_reference ?? null),
-                            'description' => "Escrow released for milestone: {$escrow->milestone->title}",
+                            'payment_reference' => $companyTransferRef,
+                            'description' => "Escrow released for milestone: {$escrow->milestone->title}" . ($platformFee > 0 ? " (₦{$platformFee} platform fee deducted)" : ''),
                             'entity_type' => 'escrow',
                             'entity_id' => $escrow->id,
+                            'total_amount' => $totalAmount,
+                            'platform_fee' => $platformFee,
+                            'net_amount' => $netAmount,
                             'milestone' => [
                                 'id' => $escrow->milestone->id,
                                 'title' => $escrow->milestone->title,
@@ -144,19 +161,57 @@ class TransactionController extends Controller
                         ]);
                     }
 
-                    // Also show to client (they paid, then it was released)
+                    // CLIENT: Shows full amount (they paid it, then it was released)
                     if ($user->isAdmin() || ($user->isClient() && $project->client_id === $user->id)) {
                         $transactions->push([
                             'id' => $escrow->id . '_release_client',
                             'type' => 'escrow_release',
-                            'amount' => (float) $escrow->amount,
+                            'amount' => $totalAmount,
                             'status' => 'success',
-                            'payment_reference' => $releaseLog && isset($releaseLog->metadata['transfer_reference']) 
-                                ? $releaseLog->metadata['transfer_reference'] 
-                                : ($escrow->payment_reference ?? null),
+                            'payment_reference' => $companyTransferRef,
                             'description' => "Escrow released to company for milestone: {$escrow->milestone->title}",
                             'entity_type' => 'escrow',
                             'entity_id' => $escrow->id,
+                            'total_amount' => $totalAmount,
+                            'platform_fee' => $platformFee,
+                            'net_amount' => $netAmount,
+                            'milestone' => [
+                                'id' => $escrow->milestone->id,
+                                'title' => $escrow->milestone->title,
+                            ],
+                            'project' => [
+                                'id' => $project->id,
+                                'title' => $project->title,
+                            ],
+                            'client' => $project->client ? [
+                                'id' => $project->client->id,
+                                'name' => $project->client->name,
+                            ] : null,
+                            'company' => $project->company ? [
+                                'id' => $project->company->id,
+                                'name' => $project->company->company_name,
+                            ] : null,
+                            'created_at' => $releaseLog 
+                                ? $releaseLog->created_at->toDateTimeString() 
+                                : $escrow->updated_at->toDateTimeString(),
+                            'updated_at' => $escrow->updated_at->toDateTimeString(),
+                        ]);
+                    }
+
+                    // ADMIN: Shows platform fee they received
+                    if ($user->isAdmin() && $platformFee > 0) {
+                        $transactions->push([
+                            'id' => $escrow->id . '_platform_fee',
+                            'type' => 'platform_fee',
+                            'amount' => $platformFee,
+                            'status' => 'success',
+                            'payment_reference' => $platformFeeTransferRef,
+                            'description' => "Platform fee from escrow release" . ($project->company ? ": {$project->company->company_name}" : '') . ($project->client ? " (Client: {$project->client->name})" : '') . " - Milestone: {$escrow->milestone->title}",
+                            'entity_type' => 'escrow',
+                            'entity_id' => $escrow->id,
+                            'total_amount' => $totalAmount,
+                            'platform_fee' => $platformFee,
+                            'net_amount' => $netAmount,
                             'milestone' => [
                                 'id' => $escrow->milestone->id,
                                 'title' => $escrow->milestone->title,
@@ -293,34 +348,153 @@ class TransactionController extends Controller
                     ->orderBy('created_at', 'desc')
                     ->first();
 
-                $transactions->push([
-                    'id' => $consultation->id . '_payment',
-                    'type' => 'consultation_payment',
-                    'amount' => (float) $consultation->price,
-                    'status' => 'success',
-                    'payment_reference' => $paymentLog && isset($paymentLog->metadata['payment_reference']) 
-                        ? $paymentLog->metadata['payment_reference'] 
-                        : null,
-                    'description' => "Consultation payment" . ($consultation->company ? ": {$consultation->company->company_name}" : ''),
-                    'entity_type' => 'consultation',
-                    'entity_id' => $consultation->id,
-                    'consultation' => [
-                        'id' => $consultation->id,
-                        'scheduled_at' => $consultation->scheduled_at ? $consultation->scheduled_at->toDateTimeString() : null,
-                    ],
-                    'client' => $consultation->client ? [
-                        'id' => $consultation->client->id,
-                        'name' => $consultation->client->name,
-                    ] : null,
-                    'company' => $consultation->company ? [
-                        'id' => $consultation->company->id,
-                        'name' => $consultation->company->company_name,
-                    ] : null,
-                    'created_at' => $paymentLog 
-                        ? $paymentLog->created_at->toDateTimeString() 
-                        : ($consultation->updated_at ? $consultation->updated_at->toDateTimeString() : $consultation->created_at->toDateTimeString()),
-                    'updated_at' => $consultation->updated_at ? $consultation->updated_at->toDateTimeString() : $consultation->created_at->toDateTimeString(),
-                ]);
+                $totalAmount = (float) $consultation->price;
+                $platformFee = (float) ($consultation->platform_fee ?? 0);
+                $netAmount = (float) ($consultation->net_amount ?? ($totalAmount - $platformFee));
+
+                // Get transfer references and status
+                $companyTransferLog = AuditLog::where('entity_type', 'consultation')
+                    ->where('entity_id', $consultation->id)
+                    ->where('action', 'consultation.company.transferred')
+                    ->orderBy('created_at', 'desc')
+                    ->first();
+
+                $platformFeeTransferLog = AuditLog::where('entity_type', 'consultation')
+                    ->where('entity_id', $consultation->id)
+                    ->where('action', 'consultation.platform.fee.transferred')
+                    ->orderBy('created_at', 'desc')
+                    ->first();
+
+                // Get transfer status from payment log
+                $companyTransferStatus = $paymentLog && isset($paymentLog->metadata['company_transfer_status']) 
+                    ? $paymentLog->metadata['company_transfer_status'] 
+                    : ($companyTransferLog ? 'transferred' : 'pending');
+                
+                $platformFeeTransferStatus = $paymentLog && isset($paymentLog->metadata['platform_fee_transfer_status']) 
+                    ? $paymentLog->metadata['platform_fee_transfer_status'] 
+                    : ($platformFeeTransferLog ? 'transferred' : 'pending');
+
+                // CLIENT: Shows full amount they paid
+                if ($user->isAdmin() || ($user->isClient() && $consultation->client_id === $user->id)) {
+                    $transactions->push([
+                        'id' => $consultation->id . '_payment_client',
+                        'type' => 'consultation_payment',
+                        'amount' => $totalAmount,
+                        'status' => 'success',
+                        'payment_reference' => $paymentLog && isset($paymentLog->metadata['payment_reference']) 
+                            ? $paymentLog->metadata['payment_reference'] 
+                            : null,
+                        'description' => "Consultation payment" . ($consultation->company ? ": {$consultation->company->company_name}" : ''),
+                        'entity_type' => 'consultation',
+                        'entity_id' => $consultation->id,
+                        'platform_fee' => $platformFee,
+                        'net_amount' => $netAmount,
+                        'consultation' => [
+                            'id' => $consultation->id,
+                            'scheduled_at' => $consultation->scheduled_at ? $consultation->scheduled_at->toDateTimeString() : null,
+                        ],
+                        'client' => $consultation->client ? [
+                            'id' => $consultation->client->id,
+                            'name' => $consultation->client->name,
+                        ] : null,
+                        'company' => $consultation->company ? [
+                            'id' => $consultation->company->id,
+                            'name' => $consultation->company->company_name,
+                        ] : null,
+                        'created_at' => $paymentLog 
+                            ? $paymentLog->created_at->toDateTimeString() 
+                            : ($consultation->updated_at ? $consultation->updated_at->toDateTimeString() : $consultation->created_at->toDateTimeString()),
+                        'updated_at' => $consultation->updated_at ? $consultation->updated_at->toDateTimeString() : $consultation->created_at->toDateTimeString(),
+                    ]);
+                }
+
+                // COMPANY: Shows net amount they received (after platform fee)
+                if ($user->isAdmin() || ($user->isCompany() && $consultation->company_id === ($user->company->id ?? null))) {
+                    // Determine status based on transfer
+                    $companyTransactionStatus = ($companyTransferStatus === 'transferred') ? 'success' : 'pending';
+                    $companyDescription = "Consultation payment received" . ($consultation->client ? " from {$consultation->client->name}" : '') . ($platformFee > 0 ? " (₦{$platformFee} platform fee deducted)" : '');
+                    
+                    // Add warning if money is in Paystack balance
+                    if ($companyTransferStatus !== 'transferred') {
+                        $companyDescription .= " - ⚠️ Money held in Paystack balance (no payment account connected)";
+                    }
+                    
+                    $transactions->push([
+                        'id' => $consultation->id . '_payment_company',
+                        'type' => 'consultation_payment',
+                        'amount' => $netAmount,
+                        'status' => $companyTransactionStatus,
+                        'payment_reference' => $companyTransferLog && isset($companyTransferLog->metadata['transfer_reference']) 
+                            ? $companyTransferLog->metadata['transfer_reference'] 
+                            : null,
+                        'description' => $companyDescription,
+                        'entity_type' => 'consultation',
+                        'entity_id' => $consultation->id,
+                        'total_amount' => $totalAmount,
+                        'platform_fee' => $platformFee,
+                        'net_amount' => $netAmount,
+                        'consultation' => [
+                            'id' => $consultation->id,
+                            'scheduled_at' => $consultation->scheduled_at ? $consultation->scheduled_at->toDateTimeString() : null,
+                        ],
+                        'client' => $consultation->client ? [
+                            'id' => $consultation->client->id,
+                            'name' => $consultation->client->name,
+                        ] : null,
+                        'company' => $consultation->company ? [
+                            'id' => $consultation->company->id,
+                            'name' => $consultation->company->company_name,
+                        ] : null,
+                        'created_at' => $companyTransferLog 
+                            ? $companyTransferLog->created_at->toDateTimeString() 
+                            : ($paymentLog ? $paymentLog->created_at->toDateTimeString() : ($consultation->updated_at ? $consultation->updated_at->toDateTimeString() : $consultation->created_at->toDateTimeString())),
+                        'updated_at' => $consultation->updated_at ? $consultation->updated_at->toDateTimeString() : $consultation->created_at->toDateTimeString(),
+                    ]);
+                }
+
+                // ADMIN: Shows platform fee they received
+                if ($user->isAdmin() && $platformFee > 0) {
+                    // Determine status based on transfer
+                    $platformFeeTransactionStatus = ($platformFeeTransferStatus === 'transferred') ? 'success' : 'pending';
+                    $platformFeeDescription = "Platform fee from consultation" . ($consultation->company ? ": {$consultation->company->company_name}" : '') . ($consultation->client ? " (Client: {$consultation->client->name})" : '');
+                    
+                    // Add warning if money is in Paystack balance
+                    if ($platformFeeTransferStatus !== 'transferred') {
+                        $platformFeeDescription .= " - ⚠️ Money held in Paystack balance (no payment account connected)";
+                    }
+                    
+                    $transactions->push([
+                        'id' => $consultation->id . '_platform_fee',
+                        'type' => 'platform_fee',
+                        'amount' => $platformFee,
+                        'status' => $platformFeeTransactionStatus,
+                        'payment_reference' => $platformFeeTransferLog && isset($platformFeeTransferLog->metadata['transfer_reference']) 
+                            ? $platformFeeTransferLog->metadata['transfer_reference'] 
+                            : null,
+                        'description' => $platformFeeDescription,
+                        'entity_type' => 'consultation',
+                        'entity_id' => $consultation->id,
+                        'total_amount' => $totalAmount,
+                        'platform_fee' => $platformFee,
+                        'net_amount' => $netAmount,
+                        'consultation' => [
+                            'id' => $consultation->id,
+                            'scheduled_at' => $consultation->scheduled_at ? $consultation->scheduled_at->toDateTimeString() : null,
+                        ],
+                        'client' => $consultation->client ? [
+                            'id' => $consultation->client->id,
+                            'name' => $consultation->client->name,
+                        ] : null,
+                        'company' => $consultation->company ? [
+                            'id' => $consultation->company->id,
+                            'name' => $consultation->company->company_name,
+                        ] : null,
+                        'created_at' => $platformFeeTransferLog 
+                            ? $platformFeeTransferLog->created_at->toDateTimeString() 
+                            : ($paymentLog ? $paymentLog->created_at->toDateTimeString() : ($consultation->updated_at ? $consultation->updated_at->toDateTimeString() : $consultation->created_at->toDateTimeString())),
+                        'updated_at' => $consultation->updated_at ? $consultation->updated_at->toDateTimeString() : $consultation->created_at->toDateTimeString(),
+                    ]);
+                }
             }
         }
 

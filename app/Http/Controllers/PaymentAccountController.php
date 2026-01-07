@@ -8,6 +8,7 @@ use App\Models\Milestone;
 use App\Services\AuditLogService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 
 class PaymentAccountController extends Controller
@@ -190,19 +191,152 @@ class PaymentAccountController extends Controller
 
         $paymentService = app(\App\Services\Payment\PaymentServiceInterface::class);
 
-        try {
-            // Prepare recipient account data
-            $recipientAccount = [
-                'name' => $account->account_name,
-                'account_number' => $account->account_number,
-                'bank_code' => $account->bank_code,
-            ];
+        // Use database transaction for atomicity
+        return DB::transaction(function () use ($milestone, $account, $paymentService, $user) {
+            // Lock the milestone/escrow record to prevent race conditions
+            $milestone = Milestone::lockForUpdate()->with(['project', 'escrow'])->findOrFail($milestone->id);
+            
+            // Re-check escrow status after lock (idempotency check)
+            if (!$milestone->escrow) {
+                return $this->errorResponse('No escrow found for this milestone', 400);
+            }
 
-            // Release funds
-            $releaseData = $paymentService->releaseFunds(
-                reference: $milestone->escrow->payment_reference,
-                recipientAccount: $recipientAccount
-            );
+            if ($milestone->escrow->status !== Escrow::STATUS_HELD) {
+                // Check if already released (idempotency)
+                if ($milestone->escrow->status === Escrow::STATUS_RELEASED) {
+                    Log::info('Escrow already released by company, returning existing state', [
+                        'milestone_id' => $milestone->id,
+                        'escrow_id' => $milestone->escrow->id,
+                        'user_id' => $user->id,
+                    ]);
+                    return $this->successResponse(
+                        [
+                            'milestone' => $milestone->load(['project', 'escrow']),
+                            'account' => $account,
+                        ],
+                        'Escrow was already released.'
+                    );
+                }
+                return $this->errorResponse('Escrow is not in held status', 400);
+            }
+
+            // Strong idempotency: Check if transfer already happened by looking for release audit log
+            $existingReleaseLog = \App\Models\AuditLog::where('entity_type', 'escrow')
+                ->where('entity_id', $milestone->escrow->id)
+                ->where('action', 'escrow.released')
+                ->where('metadata->account_id', $account->id)
+                ->whereNotNull('metadata->company_transfer_reference')
+                ->first();
+
+            if ($existingReleaseLog) {
+                Log::info('Escrow release already processed by this account, returning existing state', [
+                    'milestone_id' => $milestone->id,
+                    'escrow_id' => $milestone->escrow->id,
+                    'account_id' => $account->id,
+                    'transfer_reference' => $existingReleaseLog->metadata['company_transfer_reference'] ?? null,
+                ]);
+                return $this->successResponse(
+                    [
+                        'milestone' => $milestone->load(['project', 'escrow']),
+                        'account' => $account,
+                    ],
+                    'Escrow was already released with this account.'
+                );
+            }
+
+            try {
+                // Prepare recipient account data
+                $recipientAccount = [
+                    'name' => $account->account_name,
+                    'account_number' => $account->account_number,
+                    'bank_code' => $account->bank_code,
+                ];
+
+                // Calculate amounts
+                $totalAmount = $milestone->escrow->amount;
+                $platformFee = $milestone->escrow->platform_fee ?? 0;
+                $releaseAmount = $milestone->escrow->net_amount ?? ($totalAmount - $platformFee);
+
+                // Step 1: Release net amount to company account
+                $releaseData = $paymentService->releaseFunds(
+                    reference: $milestone->escrow->payment_reference,
+                    recipientAccount: $recipientAccount,
+                    amount: $releaseAmount
+                );
+
+            // Step 2: Transfer platform fee to admin account (if platform fee exists)
+            $platformFeeTransferData = null;
+            $platformFeeTransferStatus = 'pending';
+            if ($platformFee > 0) {
+                // Get admin user (first admin user)
+                $adminUser = \App\Models\User::where('role', 'admin')->first();
+                if ($adminUser) {
+                    $adminAccount = \App\Models\PaymentAccount::getDefaultForUser($adminUser->id);
+                    if ($adminAccount) {
+                        try {
+                            $platformFeeTransferData = $paymentService->transferFromBalance(
+                                amount: $platformFee,
+                                recipientAccount: [
+                                    'name' => $adminAccount->account_name,
+                                    'account_number' => $adminAccount->account_number,
+                                    'bank_code' => $adminAccount->bank_code,
+                                ]
+                            );
+                            
+                            $platformFeeTransferStatus = 'transferred';
+                            
+                            // Log platform fee transfer
+                            app(AuditLogService::class)->log('platform.fee.transferred', 'escrow', $milestone->escrow->id, [
+                                'escrow_id' => $milestone->escrow->id,
+                                'platform_fee' => $platformFee,
+                                'transfer_reference' => $platformFeeTransferData['transfer_reference'] ?? null,
+                                'admin_account_id' => $adminAccount->id,
+                                'status' => 'transferred',
+                            ]);
+                        } catch (\Exception $e) {
+                            $platformFeeTransferStatus = 'failed';
+                            // Log error but don't fail the release
+                            \Illuminate\Support\Facades\Log::error('Failed to transfer platform fee to admin', [
+                                'escrow_id' => $milestone->escrow->id,
+                                'platform_fee' => $platformFee,
+                                'error' => $e->getMessage(),
+                            ]);
+                            
+                            app(AuditLogService::class)->log('platform.fee.transfer.failed', 'escrow', $milestone->escrow->id, [
+                                'escrow_id' => $milestone->escrow->id,
+                                'platform_fee' => $platformFee,
+                                'error' => $e->getMessage(),
+                                'status' => 'failed',
+                                'money_location' => 'paystack_balance',
+                            ]);
+                        }
+                    } else {
+                        $platformFeeTransferStatus = 'no_account';
+                        app(AuditLogService::class)->log('platform.fee.transfer.pending', 'escrow', $milestone->escrow->id, [
+                            'escrow_id' => $milestone->escrow->id,
+                            'platform_fee' => $platformFee,
+                            'status' => 'pending',
+                            'reason' => 'admin_no_payment_account',
+                            'money_location' => 'paystack_balance',
+                            'message' => 'Admin has not connected a payment account. Platform fee remains in Paystack balance until account is added.',
+                        ]);
+                        
+                        \Illuminate\Support\Facades\Log::warning('Platform fee cannot be transferred - admin has no payment account', [
+                            'escrow_id' => $milestone->escrow->id,
+                            'admin_user_id' => $adminUser->id,
+                            'platform_fee' => $platformFee,
+                            'money_location' => 'paystack_balance',
+                        ]);
+                    }
+                } else {
+                    $platformFeeTransferStatus = 'no_account';
+                    \Illuminate\Support\Facades\Log::warning('Platform fee cannot be transferred - no admin user found', [
+                        'escrow_id' => $milestone->escrow->id,
+                        'platform_fee' => $platformFee,
+                        'money_location' => 'paystack_balance',
+                    ]);
+                }
+            }
 
             // Update escrow and milestone status
             $milestone->escrow->update([
@@ -221,30 +355,40 @@ class PaymentAccountController extends Controller
                 ]);
             }
 
-            // Log audit action
+            // Log audit action - show correct amounts and transfer references
             app(AuditLogService::class)->logEscrowAction('released', $milestone->escrow->id, [
                 'released_by' => $user->id,
-                'amount' => $milestone->escrow->amount,
+                'total_amount' => $totalAmount,
+                'platform_fee' => $platformFee,
+                'net_amount_to_company' => $releaseAmount,
+                'company_transfer_reference' => $releaseData['transfer_reference'] ?? null,
+                'company_transfer_status' => 'transferred', // Escrow release always transfers to company
+                'platform_fee_transfer_reference' => $platformFeeTransferData['transfer_reference'] ?? null,
+                'platform_fee_transfer_status' => $platformFeeTransferStatus ?? 'pending',
+                'money_location' => ($platformFeeTransferStatus === 'transferred') 
+                    ? 'transferred' 
+                    : 'paystack_balance',
                 'account_id' => $account->id,
-                'transfer_reference' => $releaseData['transfer_reference'] ?? null,
             ]);
 
-            return $this->successResponse(
-                [
-                    'milestone' => $milestone->load(['project', 'escrow']),
-                    'transfer' => $releaseData,
-                    'account' => $account,
-                ],
-                'Escrow funds released successfully.'
-            );
-        } catch (\Exception $e) {
-            Log::error('Escrow release failed', [
-                'milestone_id' => $milestoneId,
-                'user_id' => $user->id,
-                'error' => $e->getMessage(),
-            ]);
-            return $this->errorResponse('Failed to release funds: ' . $e->getMessage(), 500);
-        }
+                return $this->successResponse(
+                    [
+                        'milestone' => $milestone->load(['project', 'escrow']),
+                        'transfer' => $releaseData,
+                        'account' => $account,
+                    ],
+                    'Escrow funds released successfully.'
+                );
+            } catch (\Exception $e) {
+                Log::error('Escrow release failed', [
+                    'milestone_id' => $milestone->id,
+                    'user_id' => $user->id,
+                    'error' => $e->getMessage(),
+                ]);
+                // Transaction will rollback automatically
+                throw $e; // Re-throw to trigger rollback
+            }
+        }, 5); // Retry up to 5 times on deadlock
     }
 
     /**

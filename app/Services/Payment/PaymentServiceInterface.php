@@ -32,9 +32,10 @@ interface PaymentServiceInterface
      * 
      * @param string $reference Escrow payment reference
      * @param array $recipientAccount Account data (name, account_number, bank_code)
+     * @param float|null $amount Optional amount to release (defaults to full payment amount)
      * @return array Transfer result data
      */
-    public function releaseFunds(string $reference, array $recipientAccount): array;
+    public function releaseFunds(string $reference, array $recipientAccount, ?float $amount = null): array;
 
     /**
      * Refund a payment
@@ -43,5 +44,15 @@ interface PaymentServiceInterface
      * @return array Refund result data
      */
     public function refundPayment(string $reference): array;
+
+    /**
+     * Transfer funds from platform balance to a recipient account
+     * Used for transferring platform fees to admin account
+     * 
+     * @param float $amount Amount to transfer
+     * @param array $recipientAccount Account data (name, account_number, bank_code)
+     * @return array Transfer result data
+     */
+    public function transferFromBalance(float $amount, array $recipientAccount): array;
 }
 

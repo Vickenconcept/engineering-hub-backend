@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\Company\CreateCompanyProfileRequest;
 use App\Models\Company;
 use App\Services\AuditLogService;
+use App\Services\FileUploadService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
@@ -13,6 +14,11 @@ use Illuminate\Support\Facades\Storage;
 
 class CompanyProfileController extends Controller
 {
+    public function __construct(
+        protected readonly FileUploadService $uploadService
+    ) {
+    }
+
     /**
      * Get company profile
      */
@@ -45,12 +51,17 @@ class CompanyProfileController extends Controller
 
         $validated = $request->validated();
 
-        // Handle file uploads
+        // Handle file uploads to Cloudinary
         $licenseDocuments = [];
         if ($request->hasFile('license_documents')) {
             foreach ($request->file('license_documents') as $file) {
-                $path = $file->store('companies/licenses', 'public');
-                $licenseDocuments[] = $path;
+                try {
+                    $folder = "engineering-hub/companies/licenses";
+                    $result = $this->uploadService->uploadFile($file, $folder);
+                    $licenseDocuments[] = $result['url']; // Store Cloudinary URL
+                } catch (\Exception $e) {
+                    return $this->errorResponse('Failed to upload license document: ' . $e->getMessage(), 500);
+                }
             }
         }
 
@@ -146,12 +157,17 @@ class CompanyProfileController extends Controller
             'consultation_fee_in_validated' => isset($validated['consultation_fee']),
         ]);
 
-        // Handle file uploads
+        // Handle file uploads to Cloudinary
         if ($request->hasFile('license_documents')) {
             $licenseDocuments = [];
             foreach ($request->file('license_documents') as $file) {
-                $path = $file->store('companies/licenses', 'public');
-                $licenseDocuments[] = $path;
+                try {
+                    $folder = "engineering-hub/companies/licenses";
+                    $result = $this->uploadService->uploadFile($file, $folder);
+                    $licenseDocuments[] = $result['url']; // Store Cloudinary URL
+                } catch (\Exception $e) {
+                    return $this->errorResponse('Failed to upload license document: ' . $e->getMessage(), 500);
+                }
             }
             $validated['license_documents'] = $licenseDocuments;
         }

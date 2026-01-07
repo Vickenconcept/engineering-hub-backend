@@ -26,6 +26,9 @@ Route::middleware(['auth:sanctum', 'throttle:60,1'])->group(function () {
         Route::get('/me', [App\Http\Controllers\Auth\AuthController::class, 'me']);
     });
 
+    // File upload
+    Route::post('/upload', [App\Http\Controllers\FileUploadController::class, 'upload']);
+
     // Client routes
     Route::middleware('role:client')->prefix('client')->group(function () {
         // Companies (browse verified companies)
@@ -102,6 +105,10 @@ Route::middleware(['auth:sanctum', 'throttle:60,1'])->group(function () {
     // Admin: Get payment accounts for a user
     Route::middleware('role:admin')->prefix('admin')->group(function () {
         Route::get('users/{userId}/payment-accounts', [App\Http\Controllers\PaymentAccountController::class, 'getUserAccounts']);
+        
+        // Platform settings
+        Route::get('platform-settings/fee', [App\Http\Controllers\Admin\PlatformSettingController::class, 'getPlatformFee']);
+        Route::put('platform-settings/fee', [App\Http\Controllers\Admin\PlatformSettingController::class, 'updatePlatformFee']);
     });
 
     // Escrow operations

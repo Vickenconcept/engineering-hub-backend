@@ -5,6 +5,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 
 class MilestoneEvidence extends Model
@@ -51,10 +52,21 @@ class MilestoneEvidence extends Model
     protected $fillable = [
         'milestone_id',
         'type',
-        'file_path',
+        'file_path', // Keep for backward compatibility
+        'url', // Cloudinary URL
+        'public_id', // Cloudinary public ID for deletion
+        'thumbnail_url', // For videos
         'description',
         'uploaded_by',
     ];
+
+    /**
+     * Get the file URL (prefer Cloudinary URL over file_path)
+     */
+    public function getFileUrlAttribute(): ?string
+    {
+        return $this->url ?? ($this->file_path ? Storage::url($this->file_path) : null);
+    }
 
     /**
      * Relationship: Evidence belongs to a milestone

@@ -25,7 +25,7 @@ class CreateConsultationRequest extends FormRequest
             'company_id' => ['required', 'exists:companies,id'],
             'scheduled_at' => ['required', 'date', 'after:now'],
             'duration_minutes' => ['nullable', 'integer', 'min:15', 'max:120'],
-            'price' => ['nullable', 'numeric', 'min:0'], // Optional - will use company's fee if not provided
+            // Price is no longer accepted from client - backend uses company's consultation_fee
         ];
     }
 

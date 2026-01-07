@@ -49,6 +49,9 @@ class Escrow extends Model
     protected $fillable = [
         'milestone_id',
         'amount',
+        'platform_fee',
+        'net_amount',
+        'platform_fee_percentage',
         'payment_reference',
         'payment_provider',
         'status',
@@ -56,6 +59,9 @@ class Escrow extends Model
 
     protected $casts = [
         'amount' => 'decimal:2',
+        'platform_fee' => 'decimal:2',
+        'net_amount' => 'decimal:2',
+        'platform_fee_percentage' => 'decimal:2',
     ];
 
     /**

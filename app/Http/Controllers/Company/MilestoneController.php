@@ -6,12 +6,17 @@ use App\Http\Controllers\Controller;
 use App\Models\Milestone;
 use App\Models\Escrow;
 use App\Services\AuditLogService;
+use App\Services\FileUploadService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
 
 class MilestoneController extends Controller
 {
+    public function __construct(
+        protected readonly FileUploadService $uploadService
+    ) {
+    }
 
     /**
      * Submit milestone for approval (after completion)
@@ -77,14 +82,29 @@ class MilestoneController extends Controller
             $query->where('company_id', $company->id);
         })->findOrFail($id);
 
-        $filePath = null;
+        $url = null;
+        $publicId = null;
+        $thumbnailUrl = null;
+        
         if ($request->hasFile('file')) {
-            $filePath = $request->file('file')->store("milestones/{$milestone->id}/evidence", 'public');
+            try {
+                $folder = "engineering-hub/milestones/{$milestone->id}/evidence";
+                $result = $this->uploadService->uploadFile($request->file('file'), $folder);
+                
+                $url = $result['url'];
+                $publicId = $result['public_id'];
+                $thumbnailUrl = $result['thumbnail_url'] ?? null;
+            } catch (\Exception $e) {
+                return $this->errorResponse('Failed to upload file: ' . $e->getMessage(), 500);
+            }
         }
 
         $evidence = $milestone->evidence()->create([
             'type' => $validated['type'],
-            'file_path' => $filePath,
+            'file_path' => null, // Keep for backward compatibility but set to null
+            'url' => $url,
+            'public_id' => $publicId,
+            'thumbnail_url' => $thumbnailUrl,
             'description' => $validated['description'],
             'uploaded_by' => $user->id,
         ]);

@@ -59,6 +59,9 @@ class Consultation extends Model
         'scheduled_at',
         'duration_minutes',
         'price',
+        'platform_fee',
+        'net_amount',
+        'platform_fee_percentage',
         'payment_status',
         'meeting_link',
         'status',
@@ -67,6 +70,9 @@ class Consultation extends Model
     protected $casts = [
         'scheduled_at' => 'datetime',
         'price' => 'decimal:2',
+        'platform_fee' => 'decimal:2',
+        'net_amount' => 'decimal:2',
+        'platform_fee_percentage' => 'decimal:2',
         'duration_minutes' => 'integer',
     ];
 

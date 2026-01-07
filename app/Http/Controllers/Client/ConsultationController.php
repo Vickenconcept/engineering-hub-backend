@@ -55,11 +55,13 @@ class ConsultationController extends Controller
             return $this->errorResponse('Company is not approved yet', 403);
         }
 
-        // Use company's consultation fee as default if client doesn't specify or if price is 0
-        $price = $validated['price'] ?? 0;
-        if ($price <= 0 && $company->consultation_fee) {
-            $price = $company->consultation_fee;
+        // Security: Always use company's consultation fee, ignore any price from client
+        // This prevents price manipulation by clients
+        if (!$company->consultation_fee || $company->consultation_fee <= 0) {
+            return $this->errorResponse('Company has not set a consultation fee. Please contact the company.', 400);
         }
+        
+        $price = $company->consultation_fee;
 
         $consultation = Consultation::create([
             'client_id' => $request->user()->id,

@@ -141,7 +141,7 @@ class PaystackPaymentService extends PaymentService implements PaymentServiceInt
     /**
      * Release funds from escrow (transfer to company)
      */
-    public function releaseFunds(string $reference, array $recipientAccount): array
+    public function releaseFunds(string $reference, array $recipientAccount, ?float $amount = null): array
     {
         try {
             // First, verify the payment exists
@@ -150,6 +150,9 @@ class PaystackPaymentService extends PaymentService implements PaymentServiceInt
             if ($paymentData['status'] !== 'success') {
                 throw new \Exception('Cannot release funds from unsuccessful payment');
             }
+
+            // Use provided amount or default to full payment amount
+            $releaseAmount = $amount ?? $paymentData['amount'];
 
             // Create transfer recipient
             $recipientResponse = Http::withHeaders([
@@ -169,8 +172,8 @@ class PaystackPaymentService extends PaymentService implements PaymentServiceInt
 
             $recipientData = $recipientResponse->json('data');
 
-            // Initiate transfer
-            $amountInKobo = (int)($paymentData['amount'] * 100);
+            // Initiate transfer with release amount
+            $amountInKobo = (int)($releaseAmount * 100);
             
             $transferResponse = Http::withHeaders([
                 'Authorization' => 'Bearer ' . $this->secretKey,
@@ -197,7 +200,9 @@ class PaystackPaymentService extends PaymentService implements PaymentServiceInt
             $this->logPaymentAction('release', [
                 'original_reference' => $reference,
                 'transfer_reference' => $transferData['reference'],
-                'amount' => $paymentData['amount'],
+                'original_amount' => $paymentData['amount'],
+                'release_amount' => $releaseAmount,
+                'platform_fee' => $paymentData['amount'] - $releaseAmount,
                 'status' => 'success',
             ]);
 
@@ -371,6 +376,83 @@ class PaystackPaymentService extends PaymentService implements PaymentServiceInt
                 'error' => $e->getMessage(),
                 'account_number' => $accountNumber,
                 'bank_code' => $bankCode,
+            ]);
+            throw $e;
+        }
+    }
+
+    /**
+     * Transfer funds from platform balance to a recipient account
+     * Used for transferring platform fees to admin account
+     */
+    public function transferFromBalance(float $amount, array $recipientAccount): array
+    {
+        try {
+            $this->validateAmount($amount);
+
+            // Create transfer recipient
+            $recipientResponse = Http::withHeaders([
+                'Authorization' => 'Bearer ' . $this->secretKey,
+                'Content-Type' => 'application/json',
+            ])->post("{$this->baseUrl}/transferrecipient", [
+                'type' => 'nuban',
+                'name' => $recipientAccount['name'] ?? 'Recipient Account',
+                'account_number' => $recipientAccount['account_number'],
+                'bank_code' => $recipientAccount['bank_code'],
+                'currency' => 'NGN',
+            ]);
+
+            if (!$recipientResponse->successful()) {
+                $error = $recipientResponse->json();
+                Log::error('Paystack recipient creation failed', [
+                    'error' => $error,
+                ]);
+                throw new \Exception($error['message'] ?? 'Failed to create transfer recipient');
+            }
+
+            $recipientData = $recipientResponse->json('data');
+
+            // Transfer from balance
+            $amountInKobo = (int)($amount * 100);
+            
+            $transferResponse = Http::withHeaders([
+                'Authorization' => 'Bearer ' . $this->secretKey,
+                'Content-Type' => 'application/json',
+            ])->post("{$this->baseUrl}/transfer", [
+                'source' => 'balance',
+                'amount' => $amountInKobo,
+                'recipient' => $recipientData['recipient_code'],
+                'reason' => 'Platform fee transfer',
+                'reference' => $this->generateReference(),
+            ]);
+
+            if (!$transferResponse->successful()) {
+                $error = $transferResponse->json();
+                Log::error('Paystack balance transfer failed', [
+                    'error' => $error,
+                    'amount' => $amount,
+                ]);
+                throw new \Exception($error['message'] ?? 'Failed to initiate transfer');
+            }
+
+            $transferData = $transferResponse->json('data');
+
+            $this->logPaymentAction('balance_transfer', [
+                'amount' => $amount,
+                'transfer_reference' => $transferData['reference'],
+                'status' => 'success',
+            ]);
+
+            return [
+                'transfer_reference' => $transferData['reference'],
+                'status' => $transferData['status'],
+                'recipient' => $recipientData,
+            ];
+        } catch (\Exception $e) {
+            $this->logPaymentAction('balance_transfer', [
+                'amount' => $amount,
+                'status' => 'failed',
+                'error' => $e->getMessage(),
             ]);
             throw $e;
         }
