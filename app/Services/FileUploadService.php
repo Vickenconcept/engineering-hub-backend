@@ -20,6 +20,19 @@ class FileUploadService
     public function uploadFile(UploadedFile $file, ?string $folder = null, array $options = []): array
     {
         try {
+            // Check if Cloudinary is configured
+            $cloudinaryUrl = env('CLOUDINARY_URL');
+            $cloudinaryCloud = env('CLOUDINARY_CLOUD_NAME');
+            $cloudinaryKey = env('CLOUDINARY_KEY');
+            $cloudinarySecret = env('CLOUDINARY_SECRET');
+            
+            if (empty($cloudinaryUrl) && (empty($cloudinaryCloud) || empty($cloudinaryKey) || empty($cloudinarySecret))) {
+                throw new \Exception(
+                    'Cloudinary is not configured. Please set CLOUDINARY_URL or CLOUDINARY_CLOUD_NAME, CLOUDINARY_KEY, and CLOUDINARY_SECRET in your .env file. ' .
+                    'Get your credentials from https://cloudinary.com/console'
+                );
+            }
+
             $mimeType = $file->getMimeType();
             $isImage = str_starts_with($mimeType, 'image/');
             $isVideo = str_starts_with($mimeType, 'video/');
@@ -30,22 +43,23 @@ class FileUploadService
                 'resource_type' => $isVideo ? 'video' : 'image',
             ], $options);
 
-            // Upload to Cloudinary
-            $result = Cloudinary::upload($file->getRealPath(), $uploadOptions);
+            // Upload to Cloudinary using uploadApi
+            $cloudinary = Cloudinary::getFacadeRoot();
+            $result = $cloudinary->uploadApi()->upload($file->getRealPath(), $uploadOptions);
 
-            // Extract metadata from result array
-            $resultArray = $result->getArrayCopy();
+            // The result from uploadApi()->upload() is an array
+            // Extract data from the result array
+            $secureUrl = $result['secure_url'] ?? $result['url'] ?? null;
+            $publicId = $result['public_id'] ?? null;
+            $width = $result['width'] ?? null;
+            $height = $result['height'] ?? null;
+            $format = $result['format'] ?? null;
+            $bytes = $result['bytes'] ?? null;
+            $duration = $result['duration'] ?? null; // For videos
             
-            // Get secure URL
-            $secureUrl = $result->getSecurePath();
-            $publicId = $result->getPublicId();
-            
-            // Extract dimensions and other metadata
-            $width = $resultArray['width'] ?? null;
-            $height = $resultArray['height'] ?? null;
-            $format = $resultArray['format'] ?? null;
-            $bytes = $resultArray['bytes'] ?? null;
-            $duration = $resultArray['duration'] ?? null; // For videos
+            if (!$secureUrl) {
+                throw new \Exception('Upload succeeded but no URL was returned from Cloudinary');
+            }
 
             // Generate thumbnail URL for videos
             $thumbnailUrl = null;
@@ -72,6 +86,7 @@ class FileUploadService
         } catch (\Exception $e) {
             Log::error('FileUploadService: Upload failed', [
                 'error' => $e->getMessage(),
+                'error_trace' => $e->getTraceAsString(),
                 'file_name' => $file->getClientOriginalName(),
                 'file_size' => $file->getSize(),
                 'mime_type' => $mimeType,
@@ -90,10 +105,11 @@ class FileUploadService
     public function deleteFile(string $publicId, string $resourceType = 'image'): bool
     {
         try {
-            Cloudinary::destroy($publicId, [
+            $cloudinary = Cloudinary::getFacadeRoot();
+            $result = $cloudinary->uploadApi()->destroy($publicId, [
                 'resource_type' => $resourceType,
             ]);
-            return true;
+            return isset($result['result']) && $result['result'] === 'ok';
         } catch (\Exception $e) {
             Log::error('FileUploadService: Delete failed', [
                 'public_id' => $publicId,
