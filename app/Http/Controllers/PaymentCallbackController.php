@@ -88,9 +88,9 @@ class PaymentCallbackController extends Controller
 
     /**
      * Handle consultation payment verification
-     * @return int|null Returns consultation_id if successful
+     * @return string|null Returns consultation_id if successful
      */
-    protected function handleConsultationPayment(array $paymentData): ?int
+    protected function handleConsultationPayment(array $paymentData): ?string
     {
         $metadata = $paymentData['metadata'] ?? [];
         $consultationId = $metadata['consultation_id'] ?? null;
@@ -128,12 +128,12 @@ class PaymentCallbackController extends Controller
             ]);
         }
 
-        return $consultationId;
+        return (string) $consultationId;
     }
 
     /**
      * Handle milestone escrow payment verification
-     * @return array Returns ['milestone_id' => int, 'project_id' => int] if successful
+     * @return array Returns ['milestone_id' => string, 'project_id' => string] if successful
      */
     protected function handleMilestoneEscrowPayment(array $paymentData): array
     {

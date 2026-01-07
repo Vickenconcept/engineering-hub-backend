@@ -39,7 +39,7 @@ class CompanyController extends Controller
     /**
      * Show a specific company
      */
-    public function show(int $id): JsonResponse
+    public function show(string $id): JsonResponse
     {
         $company = Company::with('user')->findOrFail($id);
 
@@ -49,7 +49,7 @@ class CompanyController extends Controller
     /**
      * Approve a company
      */
-    public function approve(int $id): JsonResponse
+    public function approve(string $id): JsonResponse
     {
         $company = Company::findOrFail($id);
 
@@ -81,7 +81,7 @@ class CompanyController extends Controller
     /**
      * Reject a company
      */
-    public function reject(Request $request, int $id): JsonResponse
+    public function reject(Request $request, string $id): JsonResponse
     {
         $validated = $request->validate([
             'reason' => ['nullable', 'string', 'max:500'],
@@ -112,7 +112,7 @@ class CompanyController extends Controller
     /**
      * Suspend a company
      */
-    public function suspend(Request $request, int $id): JsonResponse
+    public function suspend(Request $request, string $id): JsonResponse
     {
         $validated = $request->validate([
             'reason' => ['nullable', 'string', 'max:500'],

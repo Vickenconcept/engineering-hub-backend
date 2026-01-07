@@ -12,12 +12,14 @@ return new class extends Migration
     public function up(): void
     {
         Schema::create('milestone_evidence', function (Blueprint $table) {
-            $table->id();
-            $table->foreignId('milestone_id')->constrained()->onDelete('cascade');
+            $table->uuid('id')->primary();
+            $table->uuid('milestone_id');
+            $table->foreign('milestone_id')->references('id')->on('milestones')->onDelete('cascade');
             $table->enum('type', ['image', 'video', 'text']);
             $table->string('file_path')->nullable(); // For image/video files
             $table->text('description')->nullable();
-            $table->foreignId('uploaded_by')->constrained('users')->onDelete('cascade');
+            $table->uuid('uploaded_by');
+            $table->foreign('uploaded_by')->references('id')->on('users')->onDelete('cascade');
             $table->timestamps();
 
             $table->index('milestone_id');

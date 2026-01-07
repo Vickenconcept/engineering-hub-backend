@@ -32,7 +32,7 @@ class ConsultationController extends Controller
     /**
      * Show a specific consultation
      */
-    public function show(Request $request, int $id): JsonResponse
+    public function show(Request $request, string $id): JsonResponse
     {
         $user = $request->user();
         $company = $user->company;
@@ -51,7 +51,7 @@ class ConsultationController extends Controller
     /**
      * Mark consultation as completed
      */
-    public function complete(Request $request, int $id): JsonResponse
+    public function complete(Request $request, string $id): JsonResponse
     {
         $user = $request->user();
         $company = $user->company;

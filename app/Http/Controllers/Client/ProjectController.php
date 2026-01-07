@@ -29,7 +29,7 @@ class ProjectController extends Controller
     /**
      * Show a specific project
      */
-    public function show(Request $request, int $id): JsonResponse
+    public function show(Request $request, string $id): JsonResponse
     {
         $user = $request->user();
         

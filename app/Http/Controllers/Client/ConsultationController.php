@@ -31,7 +31,7 @@ class ConsultationController extends Controller
     /**
      * Show a specific consultation
      */
-    public function show(Request $request, int $id): JsonResponse
+    public function show(Request $request, string $id): JsonResponse
     {
         $user = $request->user();
         
@@ -74,7 +74,7 @@ class ConsultationController extends Controller
     /**
      * Initialize payment for a consultation
      */
-    public function pay(Request $request, int $id): JsonResponse
+    public function pay(Request $request, string $id): JsonResponse
     {
         $user = $request->user();
         

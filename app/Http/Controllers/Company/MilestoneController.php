@@ -16,7 +16,7 @@ class MilestoneController extends Controller
     /**
      * Submit milestone for approval (after completion)
      */
-    public function submit(Request $request, int $id): JsonResponse
+    public function submit(Request $request, string $id): JsonResponse
     {
         $user = $request->user();
         $company = $user->company;
@@ -29,8 +29,9 @@ class MilestoneController extends Controller
             $query->where('company_id', $company->id);
         })->with(['project', 'escrow', 'evidence'])->findOrFail($id);
 
-        if ($milestone->status !== Milestone::STATUS_FUNDED) {
-            return $this->errorResponse('Milestone must be funded before submission', 400);
+        // Allow resubmission if milestone was rejected (for revisions)
+        if ($milestone->status !== Milestone::STATUS_FUNDED && $milestone->status !== Milestone::STATUS_REJECTED) {
+            return $this->errorResponse('Milestone must be funded or rejected before submission', 400);
         }
 
         if (!$milestone->isFunded()) {
@@ -57,7 +58,7 @@ class MilestoneController extends Controller
     /**
      * Upload evidence for milestone
      */
-    public function uploadEvidence(Request $request, int $id): JsonResponse
+    public function uploadEvidence(Request $request, string $id): JsonResponse
     {
         $validated = $request->validate([
             'type' => ['required', 'in:image,video,text'],

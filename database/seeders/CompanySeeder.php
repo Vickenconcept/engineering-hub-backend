@@ -5,6 +5,7 @@ namespace Database\Seeders;
 use App\Models\Company;
 use App\Models\User;
 use Illuminate\Database\Seeder;
+use Illuminate\Support\Str;
 
 class CompanySeeder extends Seeder
 {
@@ -19,6 +20,7 @@ class CompanySeeder extends Seeder
 
         if ($company1) {
             Company::create([
+                'id' => (string) Str::uuid(),
                 'user_id' => $company1->id,
                 'company_name' => 'Building Masters Ltd',
                 'registration_number' => 'RC123456',
@@ -39,6 +41,7 @@ class CompanySeeder extends Seeder
 
         if ($company2) {
             Company::create([
+                'id' => (string) Str::uuid(),
                 'user_id' => $company2->id,
                 'company_name' => 'Elite Construction',
                 'registration_number' => 'RC789012',

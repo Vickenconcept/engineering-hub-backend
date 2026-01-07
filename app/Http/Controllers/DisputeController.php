@@ -47,6 +47,7 @@ class DisputeController extends Controller
         $dispute = Dispute::create([
             'project_id' => $validated['project_id'],
             'milestone_id' => $validated['milestone_id'] ?? null,
+            'type' => Dispute::TYPE_DISPUTE,
             'raised_by' => $user->id,
             'reason' => $validated['reason'],
             'status' => Dispute::STATUS_OPEN,

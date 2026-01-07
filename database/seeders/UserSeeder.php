@@ -5,6 +5,7 @@ namespace Database\Seeders;
 use App\Models\User;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Str;
 
 class UserSeeder extends Seeder
 {
@@ -15,6 +16,7 @@ class UserSeeder extends Seeder
     {
         // Create admin user
         User::create([
+            'id' => (string) Str::uuid(),
             'name' => 'Admin User',
             'email' => 'admin@engineeringhub.com',
             'password' => Hash::make('password'),
@@ -25,6 +27,7 @@ class UserSeeder extends Seeder
 
         // Create client users
         User::create([
+            'id' => (string) Str::uuid(),
             'name' => 'John Doe',
             'email' => 'client@example.com',
             'phone' => '+1234567890',
@@ -35,6 +38,7 @@ class UserSeeder extends Seeder
         ]);
 
         User::create([
+            'id' => (string) Str::uuid(),
             'name' => 'Jane Smith',
             'email' => 'jane@example.com',
             'phone' => '+1234567891',
@@ -46,6 +50,7 @@ class UserSeeder extends Seeder
 
         // Create company users
         User::create([
+            'id' => (string) Str::uuid(),
             'name' => 'Building Masters Ltd',
             'email' => 'company@example.com',
             'phone' => '+2341234567890',
@@ -56,6 +61,7 @@ class UserSeeder extends Seeder
         ]);
 
         User::create([
+            'id' => (string) Str::uuid(),
             'name' => 'Elite Construction',
             'email' => 'elite@example.com',
             'phone' => '+2341234567891',

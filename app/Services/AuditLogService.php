@@ -15,7 +15,7 @@ class AuditLogService
     /**
      * Log a milestone action
      */
-    public function logMilestoneAction(string $action, int $milestoneId, ?array $metadata = null): AuditLog
+    public function logMilestoneAction(string $action, string $milestoneId, ?array $metadata = null): AuditLog
     {
         return AuditLog::log(
             "milestone.{$action}",
@@ -29,7 +29,7 @@ class AuditLogService
     /**
      * Log an escrow action
      */
-    public function logEscrowAction(string $action, int $escrowId, ?array $metadata = null): AuditLog
+    public function logEscrowAction(string $action, string $escrowId, ?array $metadata = null): AuditLog
     {
         return AuditLog::log(
             "escrow.{$action}",
@@ -43,7 +43,7 @@ class AuditLogService
     /**
      * Log a project action
      */
-    public function logProjectAction(string $action, int $projectId, ?array $metadata = null): AuditLog
+    public function logProjectAction(string $action, string $projectId, ?array $metadata = null): AuditLog
     {
         return AuditLog::log(
             "project.{$action}",
@@ -57,7 +57,7 @@ class AuditLogService
     /**
      * Log a company action
      */
-    public function logCompanyAction(string $action, int $companyId, ?array $metadata = null): AuditLog
+    public function logCompanyAction(string $action, string $companyId, ?array $metadata = null): AuditLog
     {
         return AuditLog::log(
             "company.{$action}",
@@ -71,7 +71,7 @@ class AuditLogService
     /**
      * Log a dispute action
      */
-    public function logDisputeAction(string $action, int $disputeId, ?array $metadata = null): AuditLog
+    public function logDisputeAction(string $action, string $disputeId, ?array $metadata = null): AuditLog
     {
         return AuditLog::log(
             "dispute.{$action}",
@@ -85,7 +85,7 @@ class AuditLogService
     /**
      * Log a generic action
      */
-    public function log(string $action, string $entityType, ?int $entityId = null, ?array $metadata = null): AuditLog
+    public function log(string $action, string $entityType, ?string $entityId = null, ?array $metadata = null): AuditLog
     {
         return AuditLog::log(
             $action,

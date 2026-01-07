@@ -11,7 +11,7 @@ class ProjectController extends Controller
     /**
      * Show a project (accessible by client or company associated with project)
      */
-    public function show(Request $request, int $id): JsonResponse
+    public function show(Request $request, string $id): JsonResponse
     {
         $user = $request->user();
         
@@ -23,14 +23,23 @@ class ProjectController extends Controller
             'disputes'
         ])->findOrFail($id);
 
-        // Authorization: Only client or company can view
-        $canView = $project->client_id === $user->id;
+        // Authorization: Client, company, or admin can view
+        $canView = false;
         
-        if (!$canView && $user->isCompany()) {
-            $canView = $project->company_id === $user->company?->id;
+        // Admin can view any project
+        if ($user->isAdmin()) {
+            $canView = true;
+        }
+        // Client can view their own projects
+        elseif ($project->client_id === $user->id) {
+            $canView = true;
+        }
+        // Company can view projects assigned to them
+        elseif ($user->isCompany() && $project->company_id === $user->company?->id) {
+            $canView = true;
         }
 
-        if (!$canView && !$user->isAdmin()) {
+        if (!$canView) {
             return $this->forbiddenResponse('You do not have permission to view this project');
         }
 

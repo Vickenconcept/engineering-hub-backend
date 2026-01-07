@@ -12,10 +12,13 @@ return new class extends Migration
     public function up(): void
     {
         Schema::create('disputes', function (Blueprint $table) {
-            $table->id();
-            $table->foreignId('project_id')->constrained()->onDelete('cascade');
-            $table->foreignId('milestone_id')->nullable()->constrained()->onDelete('cascade');
-            $table->foreignId('raised_by')->constrained('users')->onDelete('cascade');
+            $table->uuid('id')->primary();
+            $table->uuid('project_id');
+            $table->foreign('project_id')->references('id')->on('projects')->onDelete('cascade');
+            $table->uuid('milestone_id')->nullable();
+            $table->foreign('milestone_id')->references('id')->on('milestones')->onDelete('cascade');
+            $table->uuid('raised_by');
+            $table->foreign('raised_by')->references('id')->on('users')->onDelete('cascade');
             $table->text('reason');
             $table->enum('status', ['open', 'resolved', 'escalated'])->default('open');
             $table->text('resolution_notes')->nullable();

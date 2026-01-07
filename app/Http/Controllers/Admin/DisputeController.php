@@ -35,7 +35,7 @@ class DisputeController extends Controller
     /**
      * Show a specific dispute
      */
-    public function show(int $id): JsonResponse
+    public function show(string $id): JsonResponse
     {
         $dispute = Dispute::with(['project', 'milestone', 'raisedBy'])->findOrFail($id);
 
@@ -45,7 +45,7 @@ class DisputeController extends Controller
     /**
      * Resolve a dispute
      */
-    public function resolve(Request $request, int $id): JsonResponse
+    public function resolve(Request $request, string $id): JsonResponse
     {
         $validated = $request->validate([
             'resolution' => ['required', 'string', 'max:2000'],

@@ -31,13 +31,13 @@ class MilestoneController extends Controller
         $milestones = $query->orderBy('created_at', 'desc')
             ->paginate($perPage);
         
-        return $this->successResponse($milestones, 'Milestones with escrow retrieved successfully.');
+        return $this->paginatedResponse($milestones, 'Milestones with escrow retrieved successfully.');
     }
     
     /**
      * Release escrow funds for a milestone
      */
-    public function release(Request $request, int $id): JsonResponse
+    public function release(Request $request, string $id): JsonResponse
     {
         $validated = $request->validate([
             'override' => ['nullable', 'boolean'], // Admin override even without client approval

@@ -13,7 +13,7 @@ class MilestoneController extends Controller
     /**
      * Fund milestone escrow (deposit payment)
      */
-    public function fundEscrow(Request $request, int $id): JsonResponse
+    public function fundEscrow(Request $request, string $id): JsonResponse
     {
         $user = $request->user();
         
@@ -69,7 +69,7 @@ class MilestoneController extends Controller
     /**
      * Approve a milestone
      */
-    public function approve(Request $request, int $id): JsonResponse
+    public function approve(Request $request, string $id): JsonResponse
     {
         $user = $request->user();
         
@@ -109,7 +109,7 @@ class MilestoneController extends Controller
     /**
      * Reject a milestone
      */
-    public function reject(Request $request, int $id): JsonResponse
+    public function reject(Request $request, string $id): JsonResponse
     {
         $validated = $request->validate([
             'reason' => ['required', 'string', 'max:1000'],
@@ -129,9 +129,10 @@ class MilestoneController extends Controller
             'status' => Milestone::STATUS_REJECTED,
         ]);
 
-        // Create dispute automatically on rejection
+        // Create dispute automatically on rejection (revision request)
         $dispute = $milestone->project->disputes()->create([
             'milestone_id' => $milestone->id,
+            'type' => \App\Models\Dispute::TYPE_REVISION_REQUEST,
             'raised_by' => $user->id,
             'reason' => $validated['reason'],
             'status' => \App\Models\Dispute::STATUS_OPEN,

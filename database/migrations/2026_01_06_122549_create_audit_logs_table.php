@@ -12,11 +12,12 @@ return new class extends Migration
     public function up(): void
     {
         Schema::create('audit_logs', function (Blueprint $table) {
-            $table->id();
-            $table->foreignId('user_id')->nullable()->constrained()->onDelete('set null');
+            $table->uuid('id')->primary();
+            $table->uuid('user_id')->nullable();
+            $table->foreign('user_id')->references('id')->on('users')->onDelete('set null');
             $table->string('action'); // e.g., 'milestone.approved', 'escrow.released'
             $table->string('entity_type'); // e.g., 'milestone', 'escrow', 'project'
-            $table->unsignedBigInteger('entity_id')->nullable();
+            $table->string('entity_id')->nullable(); // Changed to string to support UUIDs
             $table->json('metadata')->nullable(); // Additional context data
             $table->timestamps();
 

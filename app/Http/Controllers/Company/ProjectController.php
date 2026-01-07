@@ -33,7 +33,7 @@ class ProjectController extends Controller
     /**
      * Show a specific project
      */
-    public function show(Request $request, int $id): JsonResponse
+    public function show(Request $request, string $id): JsonResponse
     {
         $user = $request->user();
         $company = $user->company;
@@ -57,7 +57,7 @@ class ProjectController extends Controller
     /**
      * Create milestones for a project
      */
-    public function createMilestones(\App\Http\Requests\Milestone\CreateMilestoneRequest $request, int $id): JsonResponse
+    public function createMilestones(\App\Http\Requests\Milestone\CreateMilestoneRequest $request, string $id): JsonResponse
     {
         $user = $request->user();
         $company = $user->company;

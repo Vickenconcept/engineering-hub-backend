@@ -12,8 +12,9 @@ return new class extends Migration
     public function up(): void
     {
         Schema::create('escrows', function (Blueprint $table) {
-            $table->id();
-            $table->foreignId('milestone_id')->constrained()->onDelete('cascade');
+            $table->uuid('id')->primary();
+            $table->uuid('milestone_id');
+            $table->foreign('milestone_id')->references('id')->on('milestones')->onDelete('cascade');
             $table->decimal('amount', 12, 2);
             $table->string('payment_reference')->unique();
             $table->string('payment_provider'); // 'stripe', 'paystack', etc.

@@ -38,7 +38,7 @@ class CompanyController extends Controller
     /**
      * Show a specific verified company
      */
-    public function show(int $id): JsonResponse
+    public function show(string $id): JsonResponse
     {
         $company = Company::with('user')
             ->where('status', Company::STATUS_APPROVED)
