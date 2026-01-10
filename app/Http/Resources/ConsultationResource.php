@@ -2,6 +2,7 @@
 
 namespace App\Http\Resources;
 
+use App\Helpers\MoneyFormatter;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 
@@ -20,7 +21,7 @@ class ConsultationResource extends JsonResource
             'company_id' => $this->company_id,
             'scheduled_at' => $this->scheduled_at?->toISOString(),
             'duration_minutes' => $this->duration_minutes,
-            'price' => (float) $this->price,
+            'price' => MoneyFormatter::format($this->price),
             'payment_status' => $this->payment_status,
             'meeting_link' => $this->meeting_link,
             'status' => $this->status,

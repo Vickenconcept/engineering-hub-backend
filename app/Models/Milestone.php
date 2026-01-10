@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Helpers\MoneyFormatter;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -150,5 +151,22 @@ class Milestone extends Model
             ->first();
 
         return $previous && in_array($previous->status, [self::STATUS_RELEASED, self::STATUS_APPROVED]);
+    }
+
+    /**
+     * Convert the model instance to an array.
+     *
+     * @return array<string, mixed>
+     */
+    public function toArray(): array
+    {
+        $array = parent::toArray();
+        
+        // Format money fields
+        if (isset($array['amount'])) {
+            $array['amount'] = MoneyFormatter::format($this->amount);
+        }
+        
+        return $array;
     }
 }

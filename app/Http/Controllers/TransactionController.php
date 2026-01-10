@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Helpers\MoneyFormatter;
 use App\Models\Escrow;
 use App\Models\Consultation;
 use App\Models\AuditLog;
@@ -72,7 +73,7 @@ class TransactionController extends Controller
                     $transactions->push([
                         'id' => $escrow->id . '_deposit',
                         'type' => 'escrow_deposit',
-                        'amount' => (float) $escrow->amount,
+                        'amount' => MoneyFormatter::format($escrow->amount),
                         'status' => 'success',
                         'payment_reference' => $escrow->payment_reference,
                         'description' => "Escrow deposit for milestone: {$escrow->milestone->title}",
@@ -129,15 +130,15 @@ class TransactionController extends Controller
                         $transactions->push([
                             'id' => $escrow->id . '_release',
                             'type' => 'escrow_release',
-                            'amount' => $netAmount,
+                            'amount' => MoneyFormatter::format($netAmount),
                             'status' => 'success',
                             'payment_reference' => $companyTransferRef,
-                            'description' => "Escrow released for milestone: {$escrow->milestone->title}" . ($platformFee > 0 ? " (₦{$platformFee} platform fee deducted)" : ''),
+                            'description' => "Escrow released for milestone: {$escrow->milestone->title}" . ($platformFee > 0 ? " (₦" . MoneyFormatter::format($platformFee) . " platform fee deducted)" : ''),
                             'entity_type' => 'escrow',
                             'entity_id' => $escrow->id,
-                            'total_amount' => $totalAmount,
-                            'platform_fee' => $platformFee,
-                            'net_amount' => $netAmount,
+                            'total_amount' => MoneyFormatter::format($totalAmount),
+                            'platform_fee' => MoneyFormatter::format($platformFee),
+                            'net_amount' => MoneyFormatter::format($netAmount),
                             'milestone' => [
                                 'id' => $escrow->milestone->id,
                                 'title' => $escrow->milestone->title,
@@ -166,15 +167,15 @@ class TransactionController extends Controller
                         $transactions->push([
                             'id' => $escrow->id . '_release_client',
                             'type' => 'escrow_release',
-                            'amount' => $totalAmount,
+                            'amount' => MoneyFormatter::format($totalAmount),
                             'status' => 'success',
                             'payment_reference' => $companyTransferRef,
                             'description' => "Escrow released to company for milestone: {$escrow->milestone->title}",
                             'entity_type' => 'escrow',
                             'entity_id' => $escrow->id,
-                            'total_amount' => $totalAmount,
-                            'platform_fee' => $platformFee,
-                            'net_amount' => $netAmount,
+                            'total_amount' => MoneyFormatter::format($totalAmount),
+                            'platform_fee' => MoneyFormatter::format($platformFee),
+                            'net_amount' => MoneyFormatter::format($netAmount),
                             'milestone' => [
                                 'id' => $escrow->milestone->id,
                                 'title' => $escrow->milestone->title,
@@ -203,15 +204,15 @@ class TransactionController extends Controller
                         $transactions->push([
                             'id' => $escrow->id . '_platform_fee',
                             'type' => 'platform_fee',
-                            'amount' => $platformFee,
+                            'amount' => MoneyFormatter::format($platformFee),
                             'status' => 'success',
                             'payment_reference' => $platformFeeTransferRef,
                             'description' => "Platform fee from escrow release" . ($project->company ? ": {$project->company->company_name}" : '') . ($project->client ? " (Client: {$project->client->name})" : '') . " - Milestone: {$escrow->milestone->title}",
                             'entity_type' => 'escrow',
                             'entity_id' => $escrow->id,
-                            'total_amount' => $totalAmount,
-                            'platform_fee' => $platformFee,
-                            'net_amount' => $netAmount,
+                            'total_amount' => MoneyFormatter::format($totalAmount),
+                            'platform_fee' => MoneyFormatter::format($platformFee),
+                            'net_amount' => MoneyFormatter::format($netAmount),
                             'milestone' => [
                                 'id' => $escrow->milestone->id,
                                 'title' => $escrow->milestone->title,
@@ -250,7 +251,7 @@ class TransactionController extends Controller
                         $transactions->push([
                             'id' => $escrow->id . '_refund',
                             'type' => 'escrow_refund',
-                            'amount' => (float) $escrow->amount,
+                            'amount' => MoneyFormatter::format($escrow->amount),
                             'status' => 'success',
                             'payment_reference' => $refundLog && isset($refundLog->metadata['refund_reference']) 
                                 ? $refundLog->metadata['refund_reference'] 
@@ -286,7 +287,7 @@ class TransactionController extends Controller
                         $transactions->push([
                             'id' => $escrow->id . '_refund_company',
                             'type' => 'escrow_refund',
-                            'amount' => (float) $escrow->amount,
+                            'amount' => MoneyFormatter::format($escrow->amount),
                             'status' => 'success',
                             'payment_reference' => $refundLog && isset($refundLog->metadata['refund_reference']) 
                                 ? $refundLog->metadata['refund_reference'] 
@@ -379,7 +380,7 @@ class TransactionController extends Controller
                     $transactions->push([
                         'id' => $consultation->id . '_payment_client',
                         'type' => 'consultation_payment',
-                        'amount' => $totalAmount,
+                        'amount' => MoneyFormatter::format($totalAmount),
                         'status' => 'success',
                         'payment_reference' => $paymentLog && isset($paymentLog->metadata['payment_reference']) 
                             ? $paymentLog->metadata['payment_reference'] 
@@ -387,8 +388,8 @@ class TransactionController extends Controller
                         'description' => "Consultation payment" . ($consultation->company ? ": {$consultation->company->company_name}" : ''),
                         'entity_type' => 'consultation',
                         'entity_id' => $consultation->id,
-                        'platform_fee' => $platformFee,
-                        'net_amount' => $netAmount,
+                        'platform_fee' => MoneyFormatter::format($platformFee),
+                        'net_amount' => MoneyFormatter::format($netAmount),
                         'consultation' => [
                             'id' => $consultation->id,
                             'scheduled_at' => $consultation->scheduled_at ? $consultation->scheduled_at->toDateTimeString() : null,
@@ -412,7 +413,7 @@ class TransactionController extends Controller
                 if ($user->isAdmin() || ($user->isCompany() && $consultation->company_id === ($user->company->id ?? null))) {
                     // Determine status based on transfer
                     $companyTransactionStatus = ($companyTransferStatus === 'transferred') ? 'success' : 'pending';
-                    $companyDescription = "Consultation payment received" . ($consultation->client ? " from {$consultation->client->name}" : '') . ($platformFee > 0 ? " (₦{$platformFee} platform fee deducted)" : '');
+                    $companyDescription = "Consultation payment received" . ($consultation->client ? " from {$consultation->client->name}" : '') . ($platformFee > 0 ? " (₦" . MoneyFormatter::format($platformFee) . " platform fee deducted)" : '');
                     
                     // Add warning if money is in Paystack balance
                     if ($companyTransferStatus !== 'transferred') {
@@ -422,7 +423,7 @@ class TransactionController extends Controller
                     $transactions->push([
                         'id' => $consultation->id . '_payment_company',
                         'type' => 'consultation_payment',
-                        'amount' => $netAmount,
+                        'amount' => MoneyFormatter::format($netAmount),
                         'status' => $companyTransactionStatus,
                         'payment_reference' => $companyTransferLog && isset($companyTransferLog->metadata['transfer_reference']) 
                             ? $companyTransferLog->metadata['transfer_reference'] 
@@ -430,9 +431,9 @@ class TransactionController extends Controller
                         'description' => $companyDescription,
                         'entity_type' => 'consultation',
                         'entity_id' => $consultation->id,
-                        'total_amount' => $totalAmount,
-                        'platform_fee' => $platformFee,
-                        'net_amount' => $netAmount,
+                        'total_amount' => MoneyFormatter::format($totalAmount),
+                        'platform_fee' => MoneyFormatter::format($platformFee),
+                        'net_amount' => MoneyFormatter::format($netAmount),
                         'consultation' => [
                             'id' => $consultation->id,
                             'scheduled_at' => $consultation->scheduled_at ? $consultation->scheduled_at->toDateTimeString() : null,
@@ -466,7 +467,7 @@ class TransactionController extends Controller
                     $transactions->push([
                         'id' => $consultation->id . '_platform_fee',
                         'type' => 'platform_fee',
-                        'amount' => $platformFee,
+                        'amount' => MoneyFormatter::format($platformFee),
                         'status' => $platformFeeTransactionStatus,
                         'payment_reference' => $platformFeeTransferLog && isset($platformFeeTransferLog->metadata['transfer_reference']) 
                             ? $platformFeeTransferLog->metadata['transfer_reference'] 
@@ -474,9 +475,9 @@ class TransactionController extends Controller
                         'description' => $platformFeeDescription,
                         'entity_type' => 'consultation',
                         'entity_id' => $consultation->id,
-                        'total_amount' => $totalAmount,
-                        'platform_fee' => $platformFee,
-                        'net_amount' => $netAmount,
+                        'total_amount' => MoneyFormatter::format($totalAmount),
+                        'platform_fee' => MoneyFormatter::format($platformFee),
+                        'net_amount' => MoneyFormatter::format($netAmount),
                         'consultation' => [
                             'id' => $consultation->id,
                             'scheduled_at' => $consultation->scheduled_at ? $consultation->scheduled_at->toDateTimeString() : null,

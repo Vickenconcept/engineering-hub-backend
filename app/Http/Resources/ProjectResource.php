@@ -2,6 +2,7 @@
 
 namespace App\Http\Resources;
 
+use App\Helpers\MoneyFormatter;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 
@@ -21,10 +22,10 @@ class ProjectResource extends JsonResource
             'title' => $this->title,
             'description' => $this->description,
             'location' => $this->location,
-            'budget_min' => $this->budget_min ? (float) $this->budget_min : null,
-            'budget_max' => $this->budget_max ? (float) $this->budget_max : null,
+            'budget_min' => $this->budget_min ? MoneyFormatter::format($this->budget_min) : null,
+            'budget_max' => $this->budget_max ? MoneyFormatter::format($this->budget_max) : null,
             'status' => $this->status,
-            'total_value' => $this->when(isset($this->total_value), fn () => (float) $this->total_value),
+            'total_value' => $this->when(isset($this->total_value), fn () => MoneyFormatter::format($this->total_value)),
             'has_active_dispute' => $this->when(isset($this->disputes), fn () => $this->hasActiveDispute()),
             'client' => $this->whenLoaded('client', fn () => new UserResource($this->client)),
             'company' => $this->whenLoaded('company', fn () => new CompanyResource($this->company)),
