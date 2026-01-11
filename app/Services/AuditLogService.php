@@ -83,6 +83,20 @@ class AuditLogService
     }
 
     /**
+     * Log a user action
+     */
+    public function logUserAction(string $action, string $userId, ?array $metadata = null): AuditLog
+    {
+        return AuditLog::log(
+            "user.{$action}",
+            'user',
+            $userId,
+            Auth::id(),
+            $metadata
+        );
+    }
+
+    /**
      * Log a generic action
      */
     public function log(string $action, string $entityType, ?string $entityId = null, ?array $metadata = null): AuditLog

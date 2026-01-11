@@ -54,7 +54,7 @@ class User extends Authenticatable
     const STATUS_ACTIVE = 'active';
     const STATUS_SUSPENDED = 'suspended';
     const STATUS_PENDING = 'pending';
-
+    
     /**
      * The attributes that are mass assignable.
      *

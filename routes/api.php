@@ -99,6 +99,14 @@ Route::middleware(['auth:sanctum', 'throttle:60,1'])->group(function () {
 
     // Admin routes
     Route::middleware('role:admin')->prefix('admin')->group(function () {
+        // Users
+        Route::get('users', [App\Http\Controllers\Admin\UserController::class, 'index']);
+        Route::get('users/{id}', [App\Http\Controllers\Admin\UserController::class, 'show']);
+        Route::put('users/{id}', [App\Http\Controllers\Admin\UserController::class, 'update']);
+        Route::post('users/{id}/activate', [App\Http\Controllers\Admin\UserController::class, 'activate']);
+        Route::post('users/{id}/suspend', [App\Http\Controllers\Admin\UserController::class, 'suspend']);
+        Route::delete('users/{id}', [App\Http\Controllers\Admin\UserController::class, 'destroy']);
+        
         // Companies
         Route::get('companies', [App\Http\Controllers\Admin\CompanyController::class, 'index']);
         Route::get('companies/{id}', [App\Http\Controllers\Admin\CompanyController::class, 'show']);
