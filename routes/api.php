@@ -101,6 +101,7 @@ Route::middleware(['auth:sanctum', 'throttle:60,1'])->group(function () {
     Route::middleware('role:admin')->prefix('admin')->group(function () {
         // Users
         Route::get('users', [App\Http\Controllers\Admin\UserController::class, 'index']);
+        Route::post('users', [App\Http\Controllers\Admin\UserController::class, 'store']);
         Route::get('users/{id}', [App\Http\Controllers\Admin\UserController::class, 'show']);
         Route::put('users/{id}', [App\Http\Controllers\Admin\UserController::class, 'update']);
         Route::post('users/{id}/activate', [App\Http\Controllers\Admin\UserController::class, 'activate']);
@@ -109,6 +110,7 @@ Route::middleware(['auth:sanctum', 'throttle:60,1'])->group(function () {
         
         // Companies
         Route::get('companies', [App\Http\Controllers\Admin\CompanyController::class, 'index']);
+        Route::post('companies', [App\Http\Controllers\Admin\CompanyController::class, 'store']);
         Route::get('companies/{id}', [App\Http\Controllers\Admin\CompanyController::class, 'show']);
         Route::post('companies/{id}/approve', [App\Http\Controllers\Admin\CompanyController::class, 'approve']);
         Route::post('companies/{id}/reject', [App\Http\Controllers\Admin\CompanyController::class, 'reject']);

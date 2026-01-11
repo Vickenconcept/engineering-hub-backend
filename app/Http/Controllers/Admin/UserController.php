@@ -7,6 +7,8 @@ use App\Models\User;
 use App\Services\AuditLogService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Hash;
+use Illuminate\Validation\Rules\Password;
 
 class UserController extends Controller
 {
@@ -50,6 +52,54 @@ class UserController extends Controller
         $user = User::with('company')->findOrFail($id);
 
         return $this->successResponse($user, 'User retrieved successfully');
+    }
+
+    /**
+     * Create a new user (admin only)
+     */
+    public function store(Request $request): JsonResponse
+    {
+        $validated = $request->validate([
+            'name' => ['required', 'string', 'max:255'],
+            'email' => ['required', 'string', 'email', 'max:255', 'unique:users'],
+            'phone' => ['nullable', 'string', 'max:20'],
+            'password' => ['required', Password::defaults()],
+            'role' => ['required', 'in:client,company'],
+            'status' => ['sometimes', 'in:active,suspended,pending'],
+        ]);
+
+        // Prevent creating admin users (only one admin allowed)
+        if (isset($validated['role']) && $validated['role'] === User::ROLE_ADMIN) {
+            return $this->errorResponse('Cannot create admin users. Only one admin is allowed.', 400);
+        }
+
+        // Check if admin already exists (extra safety check)
+        if ($validated['role'] === User::ROLE_ADMIN) {
+            $existingAdmin = User::where('role', User::ROLE_ADMIN)->first();
+            if ($existingAdmin) {
+                return $this->errorResponse('Only one admin is allowed in the system', 400);
+            }
+        }
+
+        $user = User::create([
+            'name' => $validated['name'],
+            'email' => $validated['email'],
+            'phone' => $validated['phone'] ?? null,
+            'password' => Hash::make($validated['password']),
+            'role' => $validated['role'],
+            'status' => $validated['status'] ?? User::STATUS_ACTIVE,
+        ]);
+
+        // Log audit action
+        app(AuditLogService::class)->logUserAction('created', $user->id, [
+            'created_by' => auth()->id(),
+            'role' => $user->role,
+        ]);
+
+        return $this->createdResponse(
+            $user->fresh(),
+            'User created successfully.'
+        );
     }
 
     /**
