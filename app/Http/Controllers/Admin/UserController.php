@@ -71,6 +71,14 @@ class UserController extends Controller
             return $this->errorResponse('You cannot change your own role', 400);
         }
 
+        // Prevent changing role to admin if there's already an admin (only one admin allowed)
+        if (isset($validated['role']) && $validated['role'] === User::ROLE_ADMIN && $user->role !== User::ROLE_ADMIN) {
+            $existingAdmin = User::where('role', User::ROLE_ADMIN)->where('id', '!=', $id)->first();
+            if ($existingAdmin) {
+                return $this->errorResponse('Only one admin is allowed in the system', 400);
+            }
+        }
+
         $user->update($validated);
 
         // Log audit action
