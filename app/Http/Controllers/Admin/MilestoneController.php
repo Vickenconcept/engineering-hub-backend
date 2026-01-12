@@ -6,6 +6,8 @@ use App\Http\Controllers\Controller;
 use App\Models\Milestone;
 use App\Models\Escrow;
 use App\Models\Project;
+use App\Notifications\EscrowReleasedNotification;
+use App\Notifications\ProjectCompletedNotification;
 use App\Services\AuditLogService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -223,6 +225,13 @@ class MilestoneController extends Controller
                     'reason' => 'All milestones released',
                     'auto_completed' => true,
                 ]);
+
+                // Send project completion notifications
+                $project->load(['client', 'company.user']);
+                $project->client->notify(new ProjectCompletedNotification($project));
+                if ($project->company->user) {
+                    $project->company->user->notify(new ProjectCompletedNotification($project));
+                }
             }
 
                 // Log audit action - show correct amounts and transfer references
@@ -243,6 +252,13 @@ class MilestoneController extends Controller
 
                 // Refresh to get latest data
                 $milestone->refresh();
+                $milestone->load(['project.client', 'project.company.user']);
+
+                // Send escrow release notifications
+                $milestone->project->client->notify(new EscrowReleasedNotification($milestone));
+                if ($milestone->project->company->user) {
+                    $milestone->project->company->user->notify(new EscrowReleasedNotification($milestone));
+                }
 
                 return $this->successResponse(
                     $milestone->load(['project', 'escrow']),

@@ -4,6 +4,8 @@ namespace App\Http\Controllers\Client;
 
 use App\Http\Controllers\Controller;
 use App\Models\Milestone;
+use App\Notifications\MilestoneApprovedNotification;
+use App\Notifications\MilestoneRejectedNotification;
 use App\Services\AuditLogService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -100,6 +102,14 @@ class MilestoneController extends Controller
             'project_id' => $milestone->project_id,
         ]);
 
+        $milestone->load(['project.company.user', 'project.client']);
+
+        // Send notifications
+        $milestone->project->client->notify(new MilestoneApprovedNotification($milestone));
+        if ($milestone->project->company->user) {
+            $milestone->project->company->user->notify(new MilestoneApprovedNotification($milestone));
+        }
+
         return $this->successResponse(
             $milestone->load(['project', 'escrow', 'evidence']),
             'Milestone approved successfully. Funds can now be released.'
@@ -144,6 +154,14 @@ class MilestoneController extends Controller
             'reason' => $validated['reason'],
             'dispute_id' => $dispute->id,
         ]);
+
+        $milestone->load(['project.company.user', 'project.client']);
+
+        // Send notifications
+        $milestone->project->client->notify(new MilestoneRejectedNotification($milestone, $validated['reason']));
+        if ($milestone->project->company->user) {
+            $milestone->project->company->user->notify(new MilestoneRejectedNotification($milestone, $validated['reason']));
+        }
 
         return $this->successResponse(
             $milestone->load(['project', 'disputes']),

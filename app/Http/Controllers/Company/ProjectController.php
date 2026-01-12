@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Company;
 use App\Http\Controllers\Controller;
 use App\Models\Project;
 use App\Models\Milestone;
+use App\Notifications\ProjectCompletedNotification;
 use App\Services\AuditLogService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -150,6 +151,14 @@ class ProjectController extends Controller
             'reason' => 'Manually completed by company',
             'auto_completed' => false,
         ]);
+
+        $project->load(['client', 'company.user']);
+
+        // Send notifications
+        $project->client->notify(new ProjectCompletedNotification($project));
+        if ($project->company->user) {
+            $project->company->user->notify(new ProjectCompletedNotification($project));
+        }
 
         return $this->successResponse(
             $project->load(['client', 'milestones.escrow']),

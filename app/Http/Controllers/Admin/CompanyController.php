@@ -6,6 +6,9 @@ use App\Http\Controllers\Controller;
 use App\Http\Resources\CompanyResource;
 use App\Models\Company;
 use App\Models\User;
+use App\Notifications\CompanyApprovedNotification;
+use App\Notifications\CompanyRejectedNotification;
+use App\Notifications\CompanySuspendedNotification;
 use App\Services\AuditLogService;
 use App\Services\FileUploadService;
 use Illuminate\Http\JsonResponse;
@@ -213,6 +216,11 @@ class CompanyController extends Controller
             'approved_by' => auth()->id(),
         ]);
 
+        $company->load('user');
+        
+        // Send notification
+        $company->user->notify(new CompanyApprovedNotification($company));
+
         return $this->successResponse(
             new CompanyResource($company->fresh()->load('user')),
             'Company approved successfully.'
@@ -243,6 +251,11 @@ class CompanyController extends Controller
             'rejected_by' => auth()->id(),
             'reason' => $validated['reason'] ?? null,
         ]);
+
+        $company->load('user');
+        
+        // Send notification
+        $company->user->notify(new CompanyRejectedNotification($company, $validated['reason'] ?? null));
 
         return $this->successResponse(
             new CompanyResource($company->fresh()->load('user')),
@@ -278,6 +291,11 @@ class CompanyController extends Controller
             'suspended_by' => auth()->id(),
             'reason' => $validated['reason'] ?? null,
         ]);
+
+        $company->load('user');
+        
+        // Send notification
+        $company->user->notify(new CompanySuspendedNotification($company, $validated['reason'] ?? null));
 
         return $this->successResponse(
             new CompanyResource($company->fresh()->load('user')),

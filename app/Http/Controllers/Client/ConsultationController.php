@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\Consultation\CreateConsultationRequest;
 use App\Models\Consultation;
 use App\Models\Company;
+use App\Notifications\ConsultationBookedNotification;
 use App\Services\Payment\PaymentServiceInterface;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -73,8 +74,16 @@ class ConsultationController extends Controller
             'status' => Consultation::STATUS_SCHEDULED,
         ]);
 
+        $consultation->load(['company.user', 'company']);
+
+        // Send notifications
+        $consultation->client->notify(new ConsultationBookedNotification($consultation));
+        if ($consultation->company->user) {
+            $consultation->company->user->notify(new ConsultationBookedNotification($consultation));
+        }
+
         return $this->createdResponse(
-            $consultation->load(['company.user', 'company']),
+            $consultation,
             'Consultation booked successfully. Please proceed to payment.'
         );
     }

@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\Dispute;
 use App\Models\Project;
+use App\Notifications\DisputeCreatedNotification;
 use App\Services\AuditLogService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -63,6 +64,14 @@ class DisputeController extends Controller
             'raised_by' => $user->id,
             'project_id' => $project->id,
         ]);
+
+        $dispute->load(['project.client', 'project.company.user', 'milestone']);
+
+        // Send notifications
+        $dispute->project->client->notify(new DisputeCreatedNotification($dispute));
+        if ($dispute->project->company->user) {
+            $dispute->project->company->user->notify(new DisputeCreatedNotification($dispute));
+        }
 
         return $this->createdResponse(
             $dispute->load(['project', 'milestone', 'raisedBy']),

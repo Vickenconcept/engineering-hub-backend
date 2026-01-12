@@ -243,6 +243,16 @@ class CompanyProfileController extends Controller
             'appeal_message' => $validated['message'] ?? null,
         ]);
 
+        // Send notifications
+        $company->load('user');
+        $company->user->notify(new AppealSubmittedNotification($company, $validated['message'] ?? null));
+        
+        // Notify all admins
+        $admins = User::where('role', User::ROLE_ADMIN)->get();
+        foreach ($admins as $admin) {
+            $admin->notify(new AppealSubmittedNotification($company, $validated['message'] ?? null));
+        }
+
         return $this->successResponse(
             $company->fresh()->load('user'),
             'Appeal submitted successfully. Our support team will review your request and contact you soon. Please do not submit multiple appeals.'

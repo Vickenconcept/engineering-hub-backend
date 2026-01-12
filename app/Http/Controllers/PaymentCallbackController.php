@@ -8,6 +8,7 @@ use App\Models\Milestone;
 use App\Models\Escrow;
 use App\Models\PaymentAccount;
 use App\Models\User;
+use App\Notifications\ConsultationPaidNotification;
 use App\Services\AuditLogService;
 use App\Services\VideoMeeting\GoogleMeetService;
 use Illuminate\Http\Request;
@@ -395,6 +396,13 @@ class PaymentCallbackController extends Controller
                 'consultation_id' => $consultation->id,
                 'reference' => $paymentData['reference'],
             ]);
+
+            // Send notifications
+            $consultation->load(['client', 'company.user']);
+            $consultation->client->notify(new ConsultationPaidNotification($consultation));
+            if ($consultation->company->user) {
+                $consultation->company->user->notify(new ConsultationPaidNotification($consultation));
+            }
         }, 5); // Retry up to 5 times on deadlock
 
         return (string) $consultationId;
