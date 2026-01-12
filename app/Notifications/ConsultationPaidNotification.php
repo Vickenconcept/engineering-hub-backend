@@ -66,7 +66,7 @@ class ConsultationPaidNotification extends Notification implements ShouldQueue
         return $message;
     }
 
-    public function toArray($notifiable): array
+    public function toDatabase($notifiable): array
     {
         $isClient = $notifiable->id === $this->consultation->client_id;
         $company = $this->consultation->company;
@@ -74,18 +74,23 @@ class ConsultationPaidNotification extends Notification implements ShouldQueue
 
         return [
             'type' => 'consultation_paid',
+            'consultation_id' => $this->consultation->id,
+            'project_id' => null,
             'title' => $isClient 
                 ? 'Consultation Payment Confirmed' 
                 : 'Consultation Payment Received',
             'message' => $isClient
                 ? "Your payment for the consultation with {$company->company_name} has been confirmed."
                 : "Payment has been received for your consultation with {$client->name}.",
+            'action_url' => url('/consultations/' . $this->consultation->id),
+            'icon' => 'dollar-sign',
+            'color' => 'success',
             'data' => [
                 'consultation_id' => $this->consultation->id,
                 'consultation_date' => $this->consultation->scheduled_at->format('F j, Y \a\t g:i A'),
                 'amount' => $this->consultation->price,
                 'meeting_link' => $this->consultation->meeting_link,
-                'action_url' => '/consultations/' . $this->consultation->id,
+                'action_url' => url('/consultations/' . $this->consultation->id),
             ],
         ];
     }

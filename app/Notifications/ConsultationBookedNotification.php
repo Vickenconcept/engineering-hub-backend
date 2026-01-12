@@ -59,7 +59,7 @@ class ConsultationBookedNotification extends Notification implements ShouldQueue
             ->line('Thank you for using our platform!');
     }
 
-    public function toArray($notifiable): array
+    public function toDatabase($notifiable): array
     {
         $isClient = $notifiable->id === $this->consultation->client_id;
         $company = $this->consultation->company;
@@ -67,17 +67,22 @@ class ConsultationBookedNotification extends Notification implements ShouldQueue
 
         return [
             'type' => 'consultation_booked',
+            'consultation_id' => $this->consultation->id,
+            'project_id' => null,
             'title' => $isClient 
                 ? 'Consultation Booked Successfully' 
                 : 'New Consultation Request Received',
             'message' => $isClient
                 ? "Your consultation with {$company->company_name} has been booked successfully."
                 : "You have received a new consultation request from {$client->name}.",
+            'action_url' => url('/consultations/' . $this->consultation->id),
+            'icon' => 'calendar',
+            'color' => 'info',
             'data' => [
                 'consultation_id' => $this->consultation->id,
                 'consultation_date' => $this->consultation->scheduled_at->format('F j, Y \a\t g:i A'),
                 'price' => $this->consultation->price,
-                'action_url' => '/consultations/' . $this->consultation->id,
+                'action_url' => url('/consultations/' . $this->consultation->id),
             ],
         ];
     }
