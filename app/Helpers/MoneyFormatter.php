@@ -6,13 +6,14 @@ class MoneyFormatter
 {
     /**
      * Format money amount with proper thousand separators and decimal places
+     * Automatically uses compact notation (K, M, B) for large numbers
      * 
      * @param float|string|null $amount
      * @param int $decimals Number of decimal places (default: 2)
-     * @param bool $compact Whether to use compact notation (K, M, B) for large numbers
+     * @param bool $compact Whether to force compact notation (default: auto-detect for amounts >= 1000)
      * @return string|null
      */
-    public static function format($amount, int $decimals = 2, bool $compact = false): ?string
+    public static function format($amount, int $decimals = 2, bool $compact = null): ?string
     {
         if ($amount === null || $amount === '') {
             return null;
@@ -21,7 +22,12 @@ class MoneyFormatter
         // Convert to float
         $amount = (float) $amount;
 
-        // If compact mode and amount is large, use compact notation
+        // Auto-detect: use compact notation for amounts >= 1000 if not explicitly disabled
+        if ($compact === null) {
+            $compact = $amount >= 1000;
+        }
+
+        // Use compact notation for large numbers
         if ($compact) {
             if ($amount >= 1000000000) {
                 // Billions
@@ -38,13 +44,14 @@ class MoneyFormatter
             }
         }
 
-        // Standard formatting with thousand separators
+        // Standard formatting with thousand separators for amounts < 1000
         return number_format($amount, $decimals, '.', ',');
     }
 
     /**
      * Format money amount as a formatted number (for API responses)
      * Returns both raw value and formatted string
+     * Uses compact notation automatically for large amounts
      * 
      * @param float|string|null $amount
      * @param int $decimals Number of decimal places (default: 2)
@@ -60,7 +67,8 @@ class MoneyFormatter
         }
 
         $raw = (float) $amount;
-        $formatted = self::format($amount, $decimals, false);
+        // Use default format which auto-detects compact notation
+        $formatted = self::format($amount, $decimals);
 
         return [
             'raw' => $raw,
