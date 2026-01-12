@@ -29,6 +29,15 @@ Route::middleware(['auth:sanctum', 'throttle:60,1'])->group(function () {
     // File upload
     Route::post('/upload', [App\Http\Controllers\FileUploadController::class, 'upload']);
 
+    // Notifications
+    Route::prefix('notifications')->group(function () {
+        Route::get('/', [App\Http\Controllers\NotificationController::class, 'index']);
+        Route::get('/unread-count', [App\Http\Controllers\NotificationController::class, 'unreadCount']);
+        Route::post('/mark-all-read', [App\Http\Controllers\NotificationController::class, 'markAllAsRead']);
+        Route::post('/{id}/read', [App\Http\Controllers\NotificationController::class, 'markAsRead']);
+        Route::delete('/{id}', [App\Http\Controllers\NotificationController::class, 'destroy']);
+    });
+
     // Client routes
     Route::middleware('role:client')->prefix('client')->group(function () {
         // Companies (browse verified companies)

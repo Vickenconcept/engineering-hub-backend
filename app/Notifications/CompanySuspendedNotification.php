@@ -7,6 +7,7 @@ use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Notifications\Messages\MailMessage;
 use Illuminate\Notifications\Notification;
+use Illuminate\Support\Facades\Log;
 
 class CompanySuspendedNotification extends Notification implements ShouldQueue
 {
@@ -19,12 +20,19 @@ class CompanySuspendedNotification extends Notification implements ShouldQueue
 
     public function via($notifiable): array
     {
-        return ['mail'];
+        return ['mail', 'database'];
     }
 
     public function toMail($notifiable): MailMessage
     {
         $user = $this->company->user;
+
+        Log::info('Sending CompanySuspendedNotification email', [
+            'user_id' => $notifiable->id,
+            'user_email' => $notifiable->email,
+            'company_id' => $this->company->id,
+            'subject' => 'Company Account Suspended',
+        ]);
 
         $message = (new MailMessage)
             ->subject('Company Account Suspended')
@@ -49,5 +57,22 @@ class CompanySuspendedNotification extends Notification implements ShouldQueue
             ->line('If you have any questions, please contact our support team.');
 
         return $message;
+    }
+
+    public function toArray($notifiable): array
+    {
+        $user = $this->company->user;
+
+        return [
+            'type' => 'company_suspended',
+            'title' => 'Company Account Suspended',
+            'message' => "Your company account for **{$this->company->company_name}** has been suspended.",
+            'data' => [
+                'company_id' => $this->company->id,
+                'company_name' => $this->company->company_name,
+                'reason' => $this->reason,
+                'action_url' => '/settings',
+            ],
+        ];
     }
 }
