@@ -24,6 +24,7 @@ class CompanyResource extends JsonResource
             'specialization' => $this->specialization,
             'verified_at' => $this->verified_at?->toISOString(),
             'status' => $this->status,
+            'suspension_reason' => $this->suspension_reason,
             'is_verified' => $this->isVerified(),
             'is_approved' => $this->isApproved(),
             'user' => $this->whenLoaded('user', fn () => new UserResource($this->user)),

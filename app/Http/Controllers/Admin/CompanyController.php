@@ -62,13 +62,43 @@ class CompanyController extends Controller
     }
 
     /**
+     * Get company appeals (suspension/rejection appeals)
+     */
+    public function getAppeals(string $id): JsonResponse
+    {
+        $company = Company::findOrFail($id);
+        
+        // Get all appeal audit logs for this company
+        $appeals = \App\Models\AuditLog::where('entity_type', 'company')
+            ->where('entity_id', $company->id)
+            ->where('action', 'company.appeal_submitted')
+            ->with('user')
+            ->latest()
+            ->get();
+
+        return $this->successResponse($appeals, 'Company appeals retrieved successfully');
+    }
+
+    /**
      * Show a specific company
      */
     public function show(string $id): JsonResponse
     {
         $company = Company::with('user')->findOrFail($id);
 
-        return $this->successResponse(new CompanyResource($company), 'Company retrieved successfully');
+        // Load appeals for this company
+        $appeals = \App\Models\AuditLog::where('entity_type', 'company')
+            ->where('entity_id', $company->id)
+            ->where('action', 'company.appeal_submitted')
+            ->with('user')
+            ->latest()
+            ->get();
+
+        $companyData = new CompanyResource($company);
+        $companyArray = $companyData->toArray(request());
+        $companyArray['appeals'] = $appeals;
+
+        return $this->successResponse($companyArray, 'Company retrieved successfully');
     }
 
     /**
@@ -237,12 +267,11 @@ class CompanyController extends Controller
 
         $company->update([
             'status' => Company::STATUS_SUSPENDED,
+            'suspension_reason' => $validated['reason'] ?? null,
         ]);
 
-        // Suspend user account
-        $company->user->update([
-            'status' => \App\Models\User::STATUS_SUSPENDED,
-        ]);
+        // Don't suspend user account - allow them to login to see suspension status and appeal
+        // The company status check will restrict their access to company features
 
         // Log audit action
         app(AuditLogService::class)->logCompanyAction('suspended', $company->id, [
@@ -253,6 +282,39 @@ class CompanyController extends Controller
         return $this->successResponse(
             new CompanyResource($company->fresh()->load('user')),
             'Company suspended successfully.'
+        );
+    }
+
+    /**
+     * Lift suspension and re-approve company
+     */
+    public function liftSuspension(Request $request, string $id): JsonResponse
+    {
+        $company = Company::findOrFail($id);
+
+        if ($company->status !== Company::STATUS_SUSPENDED) {
+            return $this->errorResponse('Company is not suspended', 400);
+        }
+
+        $company->update([
+            'status' => Company::STATUS_APPROVED,
+            'verified_at' => now(),
+            'suspension_reason' => null, // Clear suspension reason when lifted
+        ]);
+
+        // Activate user account
+        $company->user->update([
+            'status' => \App\Models\User::STATUS_ACTIVE,
+        ]);
+
+        // Log audit action
+        app(AuditLogService::class)->logCompanyAction('suspension_lifted', $company->id, [
+            'lifted_by' => auth()->id(),
+        ]);
+
+        return $this->successResponse(
+            new CompanyResource($company->fresh()->load('user')),
+            'Suspension lifted and company re-approved successfully.'
         );
     }
 }

@@ -70,6 +70,7 @@ Route::middleware(['auth:sanctum', 'throttle:60,1'])->group(function () {
         Route::post('profile', [App\Http\Controllers\Company\CompanyProfileController::class, 'store']);
         Route::put('profile', [App\Http\Controllers\Company\CompanyProfileController::class, 'update']);
         Route::post('profile/update', [App\Http\Controllers\Company\CompanyProfileController::class, 'update']); // For FormData updates
+        Route::post('profile/appeal', [App\Http\Controllers\Company\CompanyProfileController::class, 'appeal']);
         
         // Consultations
         Route::apiResource('consultations', App\Http\Controllers\Company\ConsultationController::class)
@@ -117,6 +118,8 @@ Route::middleware(['auth:sanctum', 'throttle:60,1'])->group(function () {
         Route::post('companies/{id}/approve', [App\Http\Controllers\Admin\CompanyController::class, 'approve']);
         Route::post('companies/{id}/reject', [App\Http\Controllers\Admin\CompanyController::class, 'reject']);
         Route::post('companies/{id}/suspend', [App\Http\Controllers\Admin\CompanyController::class, 'suspend']);
+        Route::post('companies/{id}/lift-suspension', [App\Http\Controllers\Admin\CompanyController::class, 'liftSuspension']);
+        Route::get('companies/{id}/appeals', [App\Http\Controllers\Admin\CompanyController::class, 'getAppeals']);
         
         // Milestones
         Route::get('milestones', [App\Http\Controllers\Admin\MilestoneController::class, 'index']);

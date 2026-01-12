@@ -23,6 +23,11 @@ class ProjectController extends Controller
             return $this->errorResponse('Company profile not found', 404);
         }
 
+        // Block suspended companies from accessing projects
+        if ($company->status === \App\Models\Company::STATUS_SUSPENDED) {
+            return $this->errorResponse('Your company account is suspended. Please contact support to appeal.', 403);
+        }
+
         $projects = Project::where('company_id', $company->id)
             ->with(['client', 'milestones.escrow'])
             ->latest()
@@ -67,6 +72,11 @@ class ProjectController extends Controller
             return $this->errorResponse('Company profile not found', 404);
         }
 
+        // Block suspended companies
+        if ($company->status === \App\Models\Company::STATUS_SUSPENDED) {
+            return $this->errorResponse('Your company account is suspended. You cannot create milestones.', 403);
+        }
+
         $project = Project::where('company_id', $company->id)
             ->findOrFail($id);
 
@@ -107,6 +117,11 @@ class ProjectController extends Controller
         
         if (!$company) {
             return $this->errorResponse('Company profile not found', 404);
+        }
+
+        // Block suspended companies
+        if ($company->status === \App\Models\Company::STATUS_SUSPENDED) {
+            return $this->errorResponse('Your company account is suspended. You cannot complete projects.', 403);
         }
 
         $project = Project::where('company_id', $company->id)

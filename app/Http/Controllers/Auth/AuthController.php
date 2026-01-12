@@ -58,7 +58,22 @@ class AuthController extends Controller
             return $this->errorResponse('Invalid credentials', 401);
         }
 
-        if (!$user->isActive()) {
+        // Allow suspended companies to login so they can see their status and appeal
+        // But block other suspended users (clients, admins)
+        if ($user->status === User::STATUS_SUSPENDED && $user->role !== User::ROLE_COMPANY) {
+            return $this->errorResponse('Your account is suspended. Please contact support.', 403);
+        }
+
+        // Block pending users (except companies with suspended company status - they can appeal)
+        if ($user->status === User::STATUS_PENDING && $user->role !== User::ROLE_COMPANY) {
+            return $this->errorResponse('Your account is pending activation. Please contact support.', 403);
+        }
+
+        // For companies: allow login even if user status is suspended (they can appeal)
+        // The company status check will be handled in the frontend/API responses
+        if ($user->role === User::ROLE_COMPANY && $user->status === User::STATUS_SUSPENDED) {
+            // Allow login - they'll see suspension banner in dashboard
+        } elseif (!$user->isActive()) {
             return $this->errorResponse('Your account is not active. Please contact support.', 403);
         }
 

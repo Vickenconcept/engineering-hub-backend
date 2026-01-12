@@ -30,6 +30,11 @@ class MilestoneController extends Controller
             return $this->errorResponse('Company profile not found', 404);
         }
 
+        // Block suspended companies
+        if ($company->status === \App\Models\Company::STATUS_SUSPENDED) {
+            return $this->errorResponse('Your company account is suspended. You cannot submit milestones.', 403);
+        }
+
         $milestone = Milestone::whereHas('project', function ($query) use ($company) {
             $query->where('company_id', $company->id);
         })->with(['project', 'escrow', 'evidence'])->findOrFail($id);
@@ -129,6 +134,11 @@ class MilestoneController extends Controller
         
         if (!$company) {
             return $this->errorResponse('Company profile not found', 404);
+        }
+
+        // Block suspended companies
+        if ($company->status === \App\Models\Company::STATUS_SUSPENDED) {
+            return $this->errorResponse('Your company account is suspended. You cannot update notes.', 403);
         }
 
         $milestone = Milestone::whereHas('project', function ($query) use ($company) {

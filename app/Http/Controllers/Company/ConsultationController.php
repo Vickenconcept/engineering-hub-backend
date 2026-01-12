@@ -21,6 +21,11 @@ class ConsultationController extends Controller
             return $this->errorResponse('Company profile not found', 404);
         }
 
+        // Block suspended companies
+        if ($company->status === \App\Models\Company::STATUS_SUSPENDED) {
+            return $this->errorResponse('Your company account is suspended. Please contact support to appeal.', 403);
+        }
+
         $consultations = Consultation::where('company_id', $company->id)
             ->with(['client'])
             ->latest()
@@ -58,6 +63,11 @@ class ConsultationController extends Controller
         
         if (!$company) {
             return $this->errorResponse('Company profile not found', 404);
+        }
+
+        // Block suspended companies
+        if ($company->status === \App\Models\Company::STATUS_SUSPENDED) {
+            return $this->errorResponse('Your company account is suspended. You cannot complete consultations.', 403);
         }
 
         $consultation = Consultation::where('company_id', $company->id)

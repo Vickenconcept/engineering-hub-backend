@@ -58,6 +58,7 @@ class Company extends Model
         'consultation_fee',
         'verified_at',
         'status',
+        'suspension_reason',
     ];
 
     protected $casts = [

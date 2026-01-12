@@ -95,6 +95,18 @@ class CompanyProfileController extends Controller
         
         $company = Company::where('user_id', $user->id)->firstOrFail();
 
+        // Block suspended companies from updating profile (except consultation_fee)
+        if ($company->status === Company::STATUS_SUSPENDED) {
+            // Allow only consultation_fee updates for suspended companies
+            $allowedFields = ['consultation_fee'];
+            $requestKeys = collect($request->all())->keys();
+            $hasRestrictedField = $requestKeys->diff($allowedFields)->isNotEmpty();
+            
+            if ($hasRestrictedField) {
+                return $this->errorResponse('Your company account is suspended. You can only update consultation fee. Please contact support to appeal your suspension.', 403);
+            }
+        }
+
         // Log incoming request data for debugging
         Log::info('Company Profile Update Request', [
             'user_id' => $user->id,
@@ -200,6 +212,40 @@ class CompanyProfileController extends Controller
         return $this->successResponse(
             $company->load('user'),
             'Company profile updated successfully.'
+        );
+    }
+
+    /**
+     * Appeal suspension / Re-request approval
+     * This creates an appeal notification for admin - does NOT auto-change status
+     */
+    public function appeal(Request $request): JsonResponse
+    {
+        $validated = $request->validate([
+            'message' => ['nullable', 'string', 'max:1000'],
+        ]);
+
+        $user = $request->user();
+        
+        $company = Company::where('user_id', $user->id)->firstOrFail();
+
+        // Only allow appeal if suspended or rejected
+        if (!in_array($company->status, [Company::STATUS_SUSPENDED, Company::STATUS_REJECTED])) {
+            return $this->errorResponse('You can only appeal if your account is suspended or rejected', 400);
+        }
+
+        // DO NOT change status - just log the appeal for admin review
+        // Admin will manually review and decide whether to lift suspension or re-approve
+        app(AuditLogService::class)->logCompanyAction('appeal_submitted', $company->id, [
+            'appealed_by' => $user->id,
+            'current_status' => $company->status,
+            'suspension_reason' => $company->suspension_reason,
+            'appeal_message' => $validated['message'] ?? null,
+        ]);
+
+        return $this->successResponse(
+            $company->fresh()->load('user'),
+            'Appeal submitted successfully. Our support team will review your request and contact you soon. Please do not submit multiple appeals.'
         );
     }
 }
