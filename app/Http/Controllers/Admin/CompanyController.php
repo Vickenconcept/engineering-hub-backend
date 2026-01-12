@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
+use App\Http\Resources\CompanyResource;
 use App\Models\Company;
 use App\Models\User;
 use App\Services\AuditLogService;
@@ -40,8 +41,24 @@ class CompanyController extends Controller
         }
 
         $companies = $query->latest()->paginate($request->get('per_page', 15));
-
-        return $this->paginatedResponse($companies, 'Companies retrieved successfully');
+        
+        // Transform paginated results using CompanyResource
+        $transformedData = CompanyResource::collection($companies->items());
+        
+        // Build paginated response manually with transformed data
+        return $this->successResponse(
+            $transformedData->resolve(),
+            'Companies retrieved successfully',
+            200,
+            [
+                'current_page' => $companies->currentPage(),
+                'per_page' => $companies->perPage(),
+                'total' => $companies->total(),
+                'last_page' => $companies->lastPage(),
+                'from' => $companies->firstItem(),
+                'to' => $companies->lastItem(),
+            ]
+        );
     }
 
     /**
@@ -51,7 +68,7 @@ class CompanyController extends Controller
     {
         $company = Company::with('user')->findOrFail($id);
 
-        return $this->successResponse($company, 'Company retrieved successfully');
+        return $this->successResponse(new CompanyResource($company), 'Company retrieved successfully');
     }
 
     /**
@@ -131,7 +148,7 @@ class CompanyController extends Controller
             ]);
 
             return $this->createdResponse(
-                $company->load('user'),
+                new CompanyResource($company->load('user')),
                 'Company created successfully.'
             );
         } catch (\Exception $e) {
@@ -167,7 +184,7 @@ class CompanyController extends Controller
         ]);
 
         return $this->successResponse(
-            $company->load('user'),
+            new CompanyResource($company->fresh()->load('user')),
             'Company approved successfully.'
         );
     }
@@ -198,7 +215,7 @@ class CompanyController extends Controller
         ]);
 
         return $this->successResponse(
-            $company->load('user'),
+            new CompanyResource($company->fresh()->load('user')),
             'Company rejected successfully.'
         );
     }
@@ -234,7 +251,7 @@ class CompanyController extends Controller
         ]);
 
         return $this->successResponse(
-            $company->load('user'),
+            new CompanyResource($company->fresh()->load('user')),
             'Company suspended successfully.'
         );
     }
