@@ -53,6 +53,7 @@ Route::middleware(['auth:sanctum', 'throttle:60,1'])->group(function () {
                 'store' => 'client.projects.store',
                 'show' => 'client.projects.show',
             ]);
+        Route::post('projects/{id}/complete', [App\Http\Controllers\Client\ProjectController::class, 'complete']);
         
         // Milestones
         Route::post('milestones/{id}/fund', [App\Http\Controllers\Client\MilestoneController::class, 'fundEscrow']);
@@ -89,6 +90,7 @@ Route::middleware(['auth:sanctum', 'throttle:60,1'])->group(function () {
                 'show' => 'company.projects.show',
             ]);
         Route::post('projects/{id}/milestones', [App\Http\Controllers\Company\ProjectController::class, 'createMilestones']);
+        Route::post('projects/{id}/complete', [App\Http\Controllers\Company\ProjectController::class, 'complete']);
         
         // Milestones
         Route::get('milestones/{id}', [App\Http\Controllers\Company\MilestoneController::class, 'show']);

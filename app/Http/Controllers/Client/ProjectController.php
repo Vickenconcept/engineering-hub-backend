@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\Project\CreateProjectRequest;
 use App\Models\Project;
 use App\Models\Consultation;
+use App\Models\Milestone;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
@@ -77,6 +78,46 @@ class ProjectController extends Controller
         return $this->createdResponse(
             $project->load(['company.user', 'company']),
             'Project created successfully. Add milestones to proceed.'
+        );
+    }
+
+    /**
+     * Mark project as completed (client)
+     */
+    public function complete(Request $request, string $id): JsonResponse
+    {
+        $user = $request->user();
+        
+        $project = Project::where('client_id', $user->id)
+            ->findOrFail($id);
+
+        if ($project->status === Project::STATUS_COMPLETED) {
+            return $this->errorResponse('Project is already completed', 400);
+        }
+
+        // Check if all milestones are released (optional validation)
+        $allMilestonesReleased = $project->milestones()
+            ->whereNotIn('status', [Milestone::STATUS_RELEASED])
+            ->doesntExist();
+
+        if (!$allMilestonesReleased) {
+            return $this->errorResponse('All milestones must be released before completing the project', 400);
+        }
+
+        $project->update([
+            'status' => Project::STATUS_COMPLETED,
+        ]);
+
+        // Log audit action
+        app(\App\Services\AuditLogService::class)->logProjectAction('completed', $project->id, [
+            'completed_by' => $user->id,
+            'reason' => 'Manually completed by client',
+            'auto_completed' => false,
+        ]);
+
+        return $this->successResponse(
+            $project->load(['company.user', 'company', 'milestones.escrow']),
+            'Project marked as completed successfully.'
         );
     }
 }

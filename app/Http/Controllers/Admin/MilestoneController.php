@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Admin;
 use App\Http\Controllers\Controller;
 use App\Models\Milestone;
 use App\Models\Escrow;
+use App\Models\Project;
 use App\Services\AuditLogService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -206,6 +207,23 @@ class MilestoneController extends Controller
             $milestone->update([
                 'status' => Milestone::STATUS_RELEASED,
             ]);
+
+            // Check if all milestones are released, then mark project as completed
+            $project = $milestone->project;
+            $allMilestonesReleased = $project->milestones()
+                ->whereNotIn('status', [Milestone::STATUS_RELEASED])
+                ->doesntExist();
+
+            if ($allMilestonesReleased && $project->status !== Project::STATUS_COMPLETED) {
+                $project->update(['status' => Project::STATUS_COMPLETED]);
+                
+                // Log audit action
+                app(AuditLogService::class)->logProjectAction('completed', $project->id, [
+                    'completed_by' => auth()->id(),
+                    'reason' => 'All milestones released',
+                    'auto_completed' => true,
+                ]);
+            }
 
                 // Log audit action - show correct amounts and transfer references
                 app(AuditLogService::class)->logEscrowAction('released', $milestone->escrow->id, [

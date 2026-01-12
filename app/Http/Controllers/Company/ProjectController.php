@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Company;
 use App\Http\Controllers\Controller;
 use App\Models\Project;
 use App\Models\Milestone;
+use App\Services\AuditLogService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
@@ -93,6 +94,51 @@ class ProjectController extends Controller
         return $this->createdResponse(
             $project->load('milestones'),
             'Milestones created successfully. The project will become active once the client verifies all milestones.'
+        );
+    }
+
+    /**
+     * Mark project as completed (company)
+     */
+    public function complete(Request $request, string $id): JsonResponse
+    {
+        $user = $request->user();
+        $company = $user->company;
+        
+        if (!$company) {
+            return $this->errorResponse('Company profile not found', 404);
+        }
+
+        $project = Project::where('company_id', $company->id)
+            ->findOrFail($id);
+
+        if ($project->status === Project::STATUS_COMPLETED) {
+            return $this->errorResponse('Project is already completed', 400);
+        }
+
+        // Check if all milestones are released (optional validation)
+        $allMilestonesReleased = $project->milestones()
+            ->whereNotIn('status', [Milestone::STATUS_RELEASED])
+            ->doesntExist();
+
+        if (!$allMilestonesReleased) {
+            return $this->errorResponse('All milestones must be released before completing the project', 400);
+        }
+
+        $project->update([
+            'status' => Project::STATUS_COMPLETED,
+        ]);
+
+        // Log audit action
+        app(AuditLogService::class)->logProjectAction('completed', $project->id, [
+            'completed_by' => $user->id,
+            'reason' => 'Manually completed by company',
+            'auto_completed' => false,
+        ]);
+
+        return $this->successResponse(
+            $project->load(['client', 'milestones.escrow']),
+            'Project marked as completed successfully.'
         );
     }
 }
