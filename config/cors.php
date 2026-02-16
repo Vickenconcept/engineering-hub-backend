@@ -26,6 +26,9 @@ return [
     'allowed_origins_patterns' => [
         '/^http:\/\/localhost:\d+$/',
         '/^http:\/\/127\.0\.0\.1:\d+$/',
+        '/^http:\/\/192\.168\.\d+\.\d+:\d+$/', // Allow local network IPs (192.168.x.x)
+        '/^http:\/\/10\.\d+\.\d+\.\d+:\d+$/', // Allow private network IPs (10.x.x.x)
+        '/^http:\/\/172\.(1[6-9]|2[0-9]|3[0-1])\.\d+\.\d+:\d+$/', // Allow private network IPs (172.16-31.x.x)
         '/^https:\/\/.*\.vercel\.app$/',
     ],
 

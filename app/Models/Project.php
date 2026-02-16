@@ -55,6 +55,14 @@ class Project extends Model
         'title',
         'description',
         'location',
+        'location_country',
+        'location_state',
+        'location_address',
+        'preview_image_url',
+        'drawing_architectural_url',
+        'drawing_structural_url',
+        'drawing_mechanical_url',
+        'drawing_technical_url',
         'budget_min',
         'budget_max',
         'status',
@@ -105,6 +113,14 @@ class Project extends Model
     public function disputes(): HasMany
     {
         return $this->hasMany(Dispute::class);
+    }
+
+    /**
+     * Relationship: Project has many documents
+     */
+    public function documents(): HasMany
+    {
+        return $this->hasMany(ProjectDocument::class);
     }
 
     /**

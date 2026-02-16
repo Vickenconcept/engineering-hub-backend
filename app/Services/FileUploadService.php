@@ -36,12 +36,22 @@ class FileUploadService
             $mimeType = $file->getMimeType();
             $isImage = str_starts_with($mimeType, 'image/');
             $isVideo = str_starts_with($mimeType, 'video/');
+            $isRaw = !$isImage && !$isVideo;
+            $originalName = $file->getClientOriginalName();
+            $originalExtension = strtolower((string) $file->getClientOriginalExtension());
 
             // Build upload options
             $uploadOptions = array_merge([
                 'folder' => $folder ?? 'engineering-hub',
-                'resource_type' => $isVideo ? 'video' : 'image',
+                'resource_type' => $isVideo ? 'video' : ($isRaw ? 'raw' : 'image'),
+                // Preserve original filename when possible so raw files keep their extensions (e.g., .pdf)
+                'use_filename' => true,
+                'unique_filename' => true,
             ], $options);
+
+            if ($isRaw && $originalExtension) {
+                $uploadOptions['format'] = $originalExtension;
+            }
 
             // Upload to Cloudinary using uploadApi
             $cloudinary = Cloudinary::getFacadeRoot();

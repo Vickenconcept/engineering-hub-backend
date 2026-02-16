@@ -51,17 +51,39 @@ class CompanyProfileController extends Controller
 
         $validated = $request->validated();
 
-        // Handle file uploads to Cloudinary
-        $licenseDocuments = [];
-        if ($request->hasFile('license_documents')) {
-            foreach ($request->file('license_documents') as $file) {
-                try {
-                    $folder = "engineering-hub/companies/licenses";
-                    $result = $this->uploadService->uploadFile($file, $folder);
-                    $licenseDocuments[] = $result['url']; // Store Cloudinary URL
-                } catch (\Exception $e) {
-                    return $this->errorResponse('Failed to upload license document: ' . $e->getMessage(), 500);
-                }
+        // Handle file uploads to Cloudinary for three separate documents
+        $folder = "engineering-hub/companies/documents";
+        
+        // Upload CAC Certificate
+        $cacCertificate = null;
+        if ($request->hasFile('cac_certificate')) {
+            try {
+                $result = $this->uploadService->uploadFile($request->file('cac_certificate'), $folder);
+                $cacCertificate = $result['url'];
+            } catch (\Exception $e) {
+                return $this->errorResponse('Failed to upload CAC Certificate: ' . $e->getMessage(), 500);
+            }
+        }
+        
+        // Upload MEMART
+        $memart = null;
+        if ($request->hasFile('memart')) {
+            try {
+                $result = $this->uploadService->uploadFile($request->file('memart'), $folder);
+                $memart = $result['url'];
+            } catch (\Exception $e) {
+                return $this->errorResponse('Failed to upload MEMART: ' . $e->getMessage(), 500);
+            }
+        }
+        
+        // Upload Application For Registration
+        $applicationForRegistration = null;
+        if ($request->hasFile('application_for_registration')) {
+            try {
+                $result = $this->uploadService->uploadFile($request->file('application_for_registration'), $folder);
+                $applicationForRegistration = $result['url'];
+            } catch (\Exception $e) {
+                return $this->errorResponse('Failed to upload Application For Registration: ' . $e->getMessage(), 500);
             }
         }
 
@@ -69,7 +91,9 @@ class CompanyProfileController extends Controller
             'user_id' => $user->id,
             'company_name' => $validated['company_name'],
             'registration_number' => $validated['registration_number'],
-            'license_documents' => !empty($licenseDocuments) ? $licenseDocuments : null,
+            'cac_certificate' => $cacCertificate,
+            'memart' => $memart,
+            'application_for_registration' => $applicationForRegistration,
             'portfolio_links' => $validated['portfolio_links'] ?? null,
             'specialization' => $validated['specialization'] ?? null,
             'status' => Company::STATUS_PENDING,
@@ -118,7 +142,12 @@ class CompanyProfileController extends Controller
 
         // Cannot update core profile fields if approved (requires admin approval for changes)
         // But consultation_fee can be updated anytime as it's a business setting
-        $coreFields = ['company_name', 'registration_number', 'license_documents', 'portfolio_links', 'specialization'];
+        $coreFields = [
+            'company_name',
+            'registration_number',
+            'portfolio_links',
+            'specialization',
+        ];
         $requestKeys = collect($request->all())->keys()->filter(function($key) {
             return $key !== 'consultation_fee'; // Exclude consultation_fee from core fields check
         });
@@ -155,8 +184,12 @@ class CompanyProfileController extends Controller
         $validated = $request->validate([
             'company_name' => ['sometimes', 'string', 'max:255'],
             'registration_number' => ['sometimes', 'string', 'unique:companies,registration_number,' . $company->id],
-            'license_documents' => ['nullable', 'array'],
-            'license_documents.*' => ['file', 'mimes:pdf,jpg,jpeg,png', 'max:5120'],
+            'cac_certificate' => ['sometimes', 'nullable', 'file', 'mimes:pdf,jpg,jpeg,png', 'max:5120'],
+            'memart' => ['sometimes', 'nullable', 'file', 'mimes:pdf,jpg,jpeg,png', 'max:5120'],
+            'application_for_registration' => ['sometimes', 'nullable', 'file', 'mimes:pdf,jpg,jpeg,png', 'max:5120'],
+            'remove_cac_certificate' => ['sometimes', 'boolean'],
+            'remove_memart' => ['sometimes', 'boolean'],
+            'remove_application_for_registration' => ['sometimes', 'boolean'],
             'portfolio_links' => ['nullable', 'array'],
             'portfolio_links.*' => ['url'],
             'specialization' => ['nullable', 'array'],
@@ -169,19 +202,43 @@ class CompanyProfileController extends Controller
             'consultation_fee_in_validated' => isset($validated['consultation_fee']),
         ]);
 
-        // Handle file uploads to Cloudinary
-        if ($request->hasFile('license_documents')) {
-            $licenseDocuments = [];
-            foreach ($request->file('license_documents') as $file) {
-                try {
-                    $folder = "engineering-hub/companies/licenses";
-                    $result = $this->uploadService->uploadFile($file, $folder);
-                    $licenseDocuments[] = $result['url']; // Store Cloudinary URL
-                } catch (\Exception $e) {
-                    return $this->errorResponse('Failed to upload license document: ' . $e->getMessage(), 500);
-                }
+        // Handle file uploads to Cloudinary for three separate documents
+        $folder = "engineering-hub/companies/documents";
+        
+        // Remove CAC Certificate
+        if ($request->boolean('remove_cac_certificate')) {
+            $validated['cac_certificate'] = null;
+        } elseif ($request->hasFile('cac_certificate')) {
+            try {
+                $result = $this->uploadService->uploadFile($request->file('cac_certificate'), $folder);
+                $validated['cac_certificate'] = $result['url'];
+            } catch (\Exception $e) {
+                return $this->errorResponse('Failed to upload CAC Certificate: ' . $e->getMessage(), 500);
             }
-            $validated['license_documents'] = $licenseDocuments;
+        }
+        
+        // Remove MEMART
+        if ($request->boolean('remove_memart')) {
+            $validated['memart'] = null;
+        } elseif ($request->hasFile('memart')) {
+            try {
+                $result = $this->uploadService->uploadFile($request->file('memart'), $folder);
+                $validated['memart'] = $result['url'];
+            } catch (\Exception $e) {
+                return $this->errorResponse('Failed to upload MEMART: ' . $e->getMessage(), 500);
+            }
+        }
+        
+        // Remove Application For Registration
+        if ($request->boolean('remove_application_for_registration')) {
+            $validated['application_for_registration'] = null;
+        } elseif ($request->hasFile('application_for_registration')) {
+            try {
+                $result = $this->uploadService->uploadFile($request->file('application_for_registration'), $folder);
+                $validated['application_for_registration'] = $result['url'];
+            } catch (\Exception $e) {
+                return $this->errorResponse('Failed to upload Application For Registration: ' . $e->getMessage(), 500);
+            }
         }
         
         // Explicitly handle consultation_fee - ensure it's included in update even if 0

@@ -4,14 +4,21 @@ namespace App\Http\Controllers\Company;
 
 use App\Http\Controllers\Controller;
 use App\Models\Project;
+use App\Models\ProjectDocument;
 use App\Models\Milestone;
 use App\Notifications\ProjectCompletedNotification;
 use App\Services\AuditLogService;
+use App\Services\FileUploadService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
 class ProjectController extends Controller
 {
+    public function __construct(
+        protected readonly FileUploadService $uploadService
+    ) {
+    }
+
     /**
      * List company's projects
      */
@@ -52,6 +59,7 @@ class ProjectController extends Controller
         $project = Project::where('company_id', $company->id)
             ->with([
                 'client',
+                'documents',
                 'milestones.escrow',
                 'milestones.evidence',
                 'disputes'
@@ -163,6 +171,98 @@ class ProjectController extends Controller
         return $this->successResponse(
             $project->load(['client', 'milestones.escrow']),
             'Project marked as completed successfully.'
+        );
+    }
+
+    /**
+     * Upload project documents (company only)
+     */
+    public function uploadDocuments(Request $request, string $id): JsonResponse
+    {
+        $user = $request->user();
+        $company = $user->company;
+
+        if (!$company) {
+            return $this->errorResponse('Company profile not found', 404);
+        }
+
+        if ($company->status === \App\Models\Company::STATUS_SUSPENDED) {
+            return $this->errorResponse('Your company account is suspended. You cannot upload documents.', 403);
+        }
+
+        $project = Project::where('company_id', $company->id)
+            ->with('documents')
+            ->findOrFail($id);
+
+        $validated = $request->validate([
+            'preview_image' => ['nullable', 'file', 'mimes:jpg,jpeg,png', 'max:5120'],
+            'drawing_architectural' => ['nullable', 'file', 'mimes:pdf,jpg,jpeg,png', 'max:5120'],
+            'drawing_structural' => ['nullable', 'file', 'mimes:pdf,jpg,jpeg,png', 'max:5120'],
+            'drawing_mechanical' => ['nullable', 'file', 'mimes:pdf,jpg,jpeg,png', 'max:5120'],
+            'drawing_technical' => ['nullable', 'file', 'mimes:pdf,jpg,jpeg,png', 'max:5120'],
+            'extra_titles' => ['nullable', 'array'],
+            'extra_titles.*' => ['string', 'max:255'],
+            'extra_files' => ['nullable', 'array'],
+            'extra_files.*' => ['file', 'mimes:pdf,jpg,jpeg,png', 'max:5120'],
+        ]);
+
+        $extraTitles = $request->input('extra_titles', []);
+        $extraFiles = $request->file('extra_files', []);
+
+        if (!empty($extraTitles) && !empty($extraFiles) && count($extraTitles) !== count($extraFiles)) {
+            return $this->errorResponse('Extra document titles and files count do not match.', 422);
+        }
+
+        $folder = "engineering-hub/projects/{$project->id}/documents";
+
+        $updates = [];
+
+        if ($request->hasFile('preview_image')) {
+            $result = $this->uploadService->uploadFile($request->file('preview_image'), $folder);
+            $updates['preview_image_url'] = $result['url'];
+        }
+
+        if ($request->hasFile('drawing_architectural')) {
+            $result = $this->uploadService->uploadFile($request->file('drawing_architectural'), $folder);
+            $updates['drawing_architectural_url'] = $result['url'];
+        }
+
+        if ($request->hasFile('drawing_structural')) {
+            $result = $this->uploadService->uploadFile($request->file('drawing_structural'), $folder);
+            $updates['drawing_structural_url'] = $result['url'];
+        }
+
+        if ($request->hasFile('drawing_mechanical')) {
+            $result = $this->uploadService->uploadFile($request->file('drawing_mechanical'), $folder);
+            $updates['drawing_mechanical_url'] = $result['url'];
+        }
+
+        if ($request->hasFile('drawing_technical')) {
+            $result = $this->uploadService->uploadFile($request->file('drawing_technical'), $folder);
+            $updates['drawing_technical_url'] = $result['url'];
+        }
+
+        if (!empty($updates)) {
+            $project->update($updates);
+        }
+
+        if (!empty($extraFiles)) {
+            foreach ($extraFiles as $index => $file) {
+                $title = $extraTitles[$index] ?? $file->getClientOriginalName();
+                $result = $this->uploadService->uploadFile($file, $folder);
+
+                ProjectDocument::create([
+                    'project_id' => $project->id,
+                    'uploaded_by' => $user->id,
+                    'title' => $title,
+                    'file_url' => $result['url'],
+                ]);
+            }
+        }
+
+        return $this->successResponse(
+            $project->fresh()->load('documents'),
+            'Project documents updated successfully.'
         );
     }
 }

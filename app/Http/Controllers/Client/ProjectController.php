@@ -39,6 +39,7 @@ class ProjectController extends Controller
             ->with([
                 'company.user',
                 'company',
+                'documents',
                 'milestones.escrow',
                 'milestones.evidence',
                 'disputes'
@@ -65,12 +66,25 @@ class ProjectController extends Controller
             return $this->errorResponse('Consultation must be completed before creating a project', 400);
         }
 
+        $location = $validated['location'] ?? null;
+        if (!$location && !empty($validated['location_address']) && !empty($validated['location_state']) && !empty($validated['location_country'])) {
+            $location = sprintf(
+                '%s, %s, %s',
+                $validated['location_address'],
+                $validated['location_state'],
+                $validated['location_country']
+            );
+        }
+
         $project = Project::create([
             'client_id' => $user->id,
             'company_id' => $consultation->company_id,
             'title' => $validated['title'],
             'description' => $validated['description'] ?? null,
-            'location' => $validated['location'],
+            'location' => $location ?? '',
+            'location_country' => $validated['location_country'] ?? null,
+            'location_state' => $validated['location_state'] ?? null,
+            'location_address' => $validated['location_address'] ?? null,
             'budget_min' => $validated['budget_min'] ?? null,
             'budget_max' => $validated['budget_max'] ?? null,
             'status' => Project::STATUS_DRAFT,

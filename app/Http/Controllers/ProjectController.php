@@ -18,6 +18,7 @@ class ProjectController extends Controller
         $project = Project::with([
             'client',
             'company.user',
+            'documents',
             'milestones.escrow',
             'milestones.evidence',
             'disputes'

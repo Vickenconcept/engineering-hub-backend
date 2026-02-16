@@ -100,6 +100,7 @@ Route::middleware(['auth:sanctum', 'throttle:60,1'])->group(function () {
                 'show' => 'company.projects.show',
             ]);
         Route::post('projects/{id}/milestones', [App\Http\Controllers\Company\ProjectController::class, 'createMilestones']);
+        Route::post('projects/{id}/documents', [App\Http\Controllers\Company\ProjectController::class, 'uploadDocuments']);
         Route::post('projects/{id}/complete', [App\Http\Controllers\Company\ProjectController::class, 'complete']);
         
         // Milestones
