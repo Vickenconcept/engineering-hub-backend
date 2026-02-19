@@ -21,8 +21,19 @@ class ProjectController extends Controller
             'documents',
             'milestones.escrow',
             'milestones.evidence',
-            'disputes'
+            'disputes',
+            'documentUpdateRequests.requestedBy',
+            'documentUpdateRequests.extraDocument'
         ])->findOrFail($id);
+
+        // Convert to array to ensure relationships are included
+        $projectArray = $project->toArray();
+        // Manually add documentUpdateRequests if it exists
+        if ($project->relationLoaded('documentUpdateRequests')) {
+            $projectArray['document_update_requests'] = $project->documentUpdateRequests->toArray();
+        }
+        
+        $project = $projectArray;
 
         // Authorization: Client, company, or admin can view
         $canView = false;

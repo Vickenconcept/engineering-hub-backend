@@ -64,11 +64,19 @@ class ProjectController extends Controller
                 'milestones.escrow',
                 'milestones.evidence',
                 'disputes',
-                'documentUpdateRequests'
+                'documentUpdateRequests.requestedBy',
+                'documentUpdateRequests.extraDocument'
             ])
             ->findOrFail($id);
 
-        return $this->successResponse($project, 'Project retrieved successfully');
+        // Convert to array to ensure relationships are included
+        $projectArray = $project->toArray();
+        // Manually add documentUpdateRequests if it exists
+        if ($project->relationLoaded('documentUpdateRequests')) {
+            $projectArray['document_update_requests'] = $project->documentUpdateRequests->toArray();
+        }
+
+        return $this->successResponse($projectArray, 'Project retrieved successfully');
     }
 
     /**
