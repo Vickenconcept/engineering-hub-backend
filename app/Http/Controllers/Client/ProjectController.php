@@ -7,6 +7,7 @@ use App\Http\Requests\Project\CreateProjectRequest;
 use App\Models\Project;
 use App\Models\Consultation;
 use App\Models\Milestone;
+use App\Models\DocumentUpdateRequest;
 use App\Notifications\ProjectCompletedNotification;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -141,6 +142,66 @@ class ProjectController extends Controller
         return $this->successResponse(
             $project->load(['company.user', 'company', 'milestones.escrow']),
             'Project marked as completed successfully.'
+        );
+    }
+
+    /**
+     * Grant a document update request
+     */
+    public function grantDocumentUpdate(Request $request, string $id): JsonResponse
+    {
+        $user = $request->user();
+        
+        $updateRequest = DocumentUpdateRequest::whereHas('project', function ($query) use ($user) {
+            $query->where('client_id', $user->id);
+        })
+        ->findOrFail($id);
+
+        if ($updateRequest->status !== DocumentUpdateRequest::STATUS_PENDING) {
+            return $this->errorResponse('This request has already been processed.', 400);
+        }
+
+        $updateRequest->update([
+            'status' => DocumentUpdateRequest::STATUS_GRANTED,
+            'granted_by' => $user->id,
+            'granted_at' => now(),
+        ]);
+
+        // TODO: Send notification to company
+
+        return $this->successResponse(
+            $updateRequest->load(['requestedBy', 'project', 'grantedBy']),
+            'Document update request granted successfully.'
+        );
+    }
+
+    /**
+     * Deny a document update request
+     */
+    public function denyDocumentUpdate(Request $request, string $id): JsonResponse
+    {
+        $user = $request->user();
+        
+        $updateRequest = DocumentUpdateRequest::whereHas('project', function ($query) use ($user) {
+            $query->where('client_id', $user->id);
+        })
+        ->findOrFail($id);
+
+        if ($updateRequest->status !== DocumentUpdateRequest::STATUS_PENDING) {
+            return $this->errorResponse('This request has already been processed.', 400);
+        }
+
+        $updateRequest->update([
+            'status' => DocumentUpdateRequest::STATUS_DENIED,
+            'granted_by' => $user->id,
+            'denied_at' => now(),
+        ]);
+
+        // TODO: Send notification to company
+
+        return $this->successResponse(
+            $updateRequest->load(['requestedBy', 'project', 'grantedBy']),
+            'Document update request denied.'
         );
     }
 }

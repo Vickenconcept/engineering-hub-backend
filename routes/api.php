@@ -70,6 +70,8 @@ Route::middleware(['auth:sanctum', 'throttle:60,1'])->group(function () {
         Route::post('milestones/{id}/reject', [App\Http\Controllers\Client\MilestoneController::class, 'reject']);
         Route::post('milestones/{id}/verify', [App\Http\Controllers\Client\MilestoneController::class, 'verify']);
         Route::put('milestones/{id}/notes', [App\Http\Controllers\Client\MilestoneController::class, 'updateNotes']);
+        Route::post('document-update-requests/{id}/grant', [App\Http\Controllers\Client\ProjectController::class, 'grantDocumentUpdate']);
+        Route::post('document-update-requests/{id}/deny', [App\Http\Controllers\Client\ProjectController::class, 'denyDocumentUpdate']);
     });
 
     // Company routes
@@ -102,6 +104,7 @@ Route::middleware(['auth:sanctum', 'throttle:60,1'])->group(function () {
         Route::post('projects/{id}/milestones', [App\Http\Controllers\Company\ProjectController::class, 'createMilestones']);
         Route::post('projects/{id}/documents', [App\Http\Controllers\Company\ProjectController::class, 'uploadDocuments']);
         Route::post('projects/{id}/complete', [App\Http\Controllers\Company\ProjectController::class, 'complete']);
+        Route::post('projects/{id}/document-update-request', [App\Http\Controllers\Company\ProjectController::class, 'requestDocumentUpdate']);
         
         // Milestones
         Route::get('milestones/{id}', [App\Http\Controllers\Company\MilestoneController::class, 'show']);

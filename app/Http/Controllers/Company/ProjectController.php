@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Project;
 use App\Models\ProjectDocument;
 use App\Models\Milestone;
+use App\Models\DocumentUpdateRequest;
 use App\Notifications\ProjectCompletedNotification;
 use App\Services\AuditLogService;
 use App\Services\FileUploadService;
@@ -62,7 +63,8 @@ class ProjectController extends Controller
                 'documents',
                 'milestones.escrow',
                 'milestones.evidence',
-                'disputes'
+                'disputes',
+                'documentUpdateRequests'
             ])
             ->findOrFail($id);
 
@@ -194,6 +196,33 @@ class ProjectController extends Controller
             ->with('documents')
             ->findOrFail($id);
 
+        // Check if document updates require permission
+        $mainDocumentTypes = ['preview_image', 'drawing_architectural', 'drawing_structural', 'drawing_mechanical', 'drawing_technical'];
+        $requiresPermission = [];
+        
+        foreach ($mainDocumentTypes as $docType) {
+            $fieldName = $docType === 'preview_image' ? 'preview_image_url' : $docType . '_url';
+            if ($request->hasFile($docType) && $project->$fieldName) {
+                // Check if there's a granted update request
+                $updateRequest = DocumentUpdateRequest::where('project_id', $project->id)
+                    ->where('document_type', $docType)
+                    ->where('status', DocumentUpdateRequest::STATUS_GRANTED)
+                    ->latest()
+                    ->first();
+                
+                if (!$updateRequest) {
+                    $requiresPermission[] = $docType;
+                }
+            }
+        }
+
+        if (!empty($requiresPermission)) {
+            return $this->errorResponse(
+                'You need permission to update these documents. Please request an update first: ' . implode(', ', $requiresPermission),
+                403
+            );
+        }
+
         $validated = $request->validate([
             'preview_image' => ['nullable', 'file', 'mimes:jpg,jpeg,png', 'max:5120'],
             'drawing_architectural' => ['nullable', 'file', 'mimes:pdf,jpg,jpeg,png', 'max:5120'],
@@ -244,6 +273,16 @@ class ProjectController extends Controller
 
         if (!empty($updates)) {
             $project->update($updates);
+            
+            // Mark granted update requests as used (delete them after successful update)
+            foreach ($mainDocumentTypes as $docType) {
+                if ($request->hasFile($docType)) {
+                    DocumentUpdateRequest::where('project_id', $project->id)
+                        ->where('document_type', $docType)
+                        ->where('status', DocumentUpdateRequest::STATUS_GRANTED)
+                        ->delete();
+                }
+            }
         }
 
         if (!empty($extraFiles)) {
@@ -263,6 +302,79 @@ class ProjectController extends Controller
         return $this->successResponse(
             $project->fresh()->load('documents'),
             'Project documents updated successfully.'
+        );
+    }
+
+    /**
+     * Request permission to update a document
+     */
+    public function requestDocumentUpdate(Request $request, string $id): JsonResponse
+    {
+        $user = $request->user();
+        $company = $user->company;
+
+        if (!$company) {
+            return $this->errorResponse('Company profile not found', 404);
+        }
+
+        if ($company->status === \App\Models\Company::STATUS_SUSPENDED) {
+            return $this->errorResponse('Your company account is suspended. You cannot request document updates.', 403);
+        }
+
+        $project = Project::where('company_id', $company->id)
+            ->findOrFail($id);
+
+        $validated = $request->validate([
+            'document_type' => ['required', 'string', 'in:preview_image,drawing_architectural,drawing_structural,drawing_mechanical,drawing_technical,extra_document'],
+            'extra_document_id' => ['nullable', 'required_if:document_type,extra_document', 'uuid', 'exists:project_documents,id'],
+            'reason' => ['nullable', 'string', 'max:1000'],
+        ]);
+
+        $documentType = $validated['document_type'];
+        
+        // Check if document exists (for main documents)
+        if ($documentType !== 'extra_document') {
+            $fieldName = $documentType === 'preview_image' ? 'preview_image_url' : $documentType . '_url';
+            if (!$project->$fieldName) {
+                return $this->errorResponse('Document does not exist. You can upload it directly.', 400);
+            }
+        } else {
+            // For extra documents, check if it exists
+            $extraDoc = ProjectDocument::where('id', $validated['extra_document_id'])
+                ->where('project_id', $project->id)
+                ->first();
+            
+            if (!$extraDoc) {
+                return $this->errorResponse('Extra document not found', 404);
+            }
+        }
+
+        // Check if there's already a pending request
+        $existingRequest = DocumentUpdateRequest::where('project_id', $project->id)
+            ->where('document_type', $documentType)
+            ->where('extra_document_id', $validated['extra_document_id'] ?? null)
+            ->where('status', DocumentUpdateRequest::STATUS_PENDING)
+            ->first();
+
+        if ($existingRequest) {
+            return $this->errorResponse('You already have a pending request for this document.', 400);
+        }
+
+        // Create the request
+        $updateRequest = DocumentUpdateRequest::create([
+            'project_id' => $project->id,
+            'document_type' => $documentType,
+            'extra_document_id' => $validated['extra_document_id'] ?? null,
+            'requested_by' => $user->id,
+            'reason' => $validated['reason'] ?? null,
+            'status' => DocumentUpdateRequest::STATUS_PENDING,
+        ]);
+
+        // TODO: Send notification to client
+
+        return $this->successResponse(
+            $updateRequest->load(['requestedBy', 'project']),
+            'Document update request submitted successfully. Waiting for client approval.'
         );
     }
 }

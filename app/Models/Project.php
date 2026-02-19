@@ -124,6 +124,14 @@ class Project extends Model
     }
 
     /**
+     * Relationship: Project has many document update requests
+     */
+    public function documentUpdateRequests(): HasMany
+    {
+        return $this->hasMany(DocumentUpdateRequest::class);
+    }
+
+    /**
      * Check if project has active dispute
      */
     public function hasActiveDispute(): bool
