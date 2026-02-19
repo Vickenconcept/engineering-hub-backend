@@ -20,19 +20,6 @@ class FileUploadService
     public function uploadFile(UploadedFile $file, ?string $folder = null, array $options = []): array
     {
         try {
-            // Check if Cloudinary is configured
-            $cloudinaryUrl = env('CLOUDINARY_URL');
-            $cloudinaryCloud = env('CLOUDINARY_CLOUD_NAME');
-            $cloudinaryKey = env('CLOUDINARY_KEY');
-            $cloudinarySecret = env('CLOUDINARY_SECRET');
-            
-            if (empty($cloudinaryUrl) && (empty($cloudinaryCloud) || empty($cloudinaryKey) || empty($cloudinarySecret))) {
-                throw new \Exception(
-                    'Cloudinary is not configured. Please set CLOUDINARY_URL or CLOUDINARY_CLOUD_NAME, CLOUDINARY_KEY, and CLOUDINARY_SECRET in your .env file. ' .
-                    'Get your credentials from https://cloudinary.com/console'
-                );
-            }
-
             $mimeType = $file->getMimeType();
             $isImage = str_starts_with($mimeType, 'image/');
             $isVideo = str_starts_with($mimeType, 'video/');
