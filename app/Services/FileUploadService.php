@@ -97,9 +97,9 @@ class FileUploadService
             Log::error('FileUploadService: Upload failed', [
                 'error' => $e->getMessage(),
                 'error_trace' => $e->getTraceAsString(),
-                'file_name' => $file->getClientOriginalName(),
-                'file_size' => $file->getSize(),
-                'mime_type' => $mimeType,
+                'file_name' => $file->getClientOriginalName() ?? 'unknown',
+                'file_size' => $file->getSize() ?? null,
+                'mime_type' => $mimeType ?? ($file->getMimeType() ?? 'unknown'),
             ]);
             throw new \Exception('Failed to upload file: ' . $e->getMessage());
         }
