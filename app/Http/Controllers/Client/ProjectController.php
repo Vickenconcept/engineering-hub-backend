@@ -43,7 +43,9 @@ class ProjectController extends Controller
                 'documents',
                 'milestones.escrow',
                 'milestones.evidence',
-                'disputes'
+                'disputes',
+                'documentUpdateRequests.requestedBy',
+                'documentUpdateRequests.extraDocument'
             ])
             ->findOrFail($id);
 
