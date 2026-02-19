@@ -12,6 +12,7 @@ use App\Services\AuditLogService;
 use App\Services\FileUploadService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Log;
 
 class ProjectController extends Controller
 {
@@ -64,7 +65,7 @@ class ProjectController extends Controller
                 'milestones.escrow',
                 'milestones.evidence',
                 'disputes',
-                'documentUpdateRequests.requestedBy',
+                'documentUpdateRequests.requestedBy.company',
                 'documentUpdateRequests.extraDocument'
             ])
             ->findOrFail($id);
@@ -85,6 +86,10 @@ class ProjectController extends Controller
                         'name' => $request->requestedBy->name,
                         'email' => $request->requestedBy->email,
                     ] : null,
+                    'company' => $request->requestedBy && $request->requestedBy->company ? [
+                        'id' => $request->requestedBy->company->id,
+                        'company_name' => $request->requestedBy->company->company_name,
+                    ] : null,
                     'status' => $request->status,
                     'reason' => $request->reason,
                     'granted_at' => $request->granted_at?->toISOString(),
@@ -100,7 +105,7 @@ class ProjectController extends Controller
             })->toArray();
         } else {
             // Log if relationship is not loaded
-            \Log::info('DocumentUpdateRequests not loaded', [
+            Log::info('DocumentUpdateRequests not loaded', [
                 'relationLoaded' => $project->relationLoaded('documentUpdateRequests'),
                 'hasRequests' => $project->documentUpdateRequests ? 'yes' : 'no',
             ]);
@@ -268,6 +273,11 @@ class ProjectController extends Controller
             'drawing_structural' => ['nullable', 'file', 'mimes:pdf,jpg,jpeg,png', 'max:5120'],
             'drawing_mechanical' => ['nullable', 'file', 'mimes:pdf,jpg,jpeg,png', 'max:5120'],
             'drawing_technical' => ['nullable', 'file', 'mimes:pdf,jpg,jpeg,png', 'max:5120'],
+            'remove_preview_image' => ['nullable', 'boolean'],
+            'remove_drawing_architectural' => ['nullable', 'boolean'],
+            'remove_drawing_structural' => ['nullable', 'boolean'],
+            'remove_drawing_mechanical' => ['nullable', 'boolean'],
+            'remove_drawing_technical' => ['nullable', 'boolean'],
             'extra_titles' => ['nullable', 'array'],
             'extra_titles.*' => ['string', 'max:255'],
             'extra_files' => ['nullable', 'array'],
@@ -285,6 +295,33 @@ class ProjectController extends Controller
 
         $updates = [];
 
+        // Handle removals first (check for granted permission)
+        $removalTypes = [
+            'remove_preview_image' => 'preview_image',
+            'remove_drawing_architectural' => 'drawing_architectural',
+            'remove_drawing_structural' => 'drawing_structural',
+            'remove_drawing_mechanical' => 'drawing_mechanical',
+            'remove_drawing_technical' => 'drawing_technical',
+        ];
+
+        foreach ($removalTypes as $removeFlag => $docType) {
+            if ($request->has($removeFlag) && $request->input($removeFlag)) {
+                $fieldName = $docType === 'preview_image' ? 'preview_image_url' : $docType . '_url';
+                
+                // Check if there's a granted update request
+                $updateRequest = DocumentUpdateRequest::where('project_id', $project->id)
+                    ->where('document_type', $docType)
+                    ->where('status', DocumentUpdateRequest::STATUS_GRANTED)
+                    ->latest()
+                    ->first();
+                
+                if ($updateRequest) {
+                    $updates[$fieldName] = null;
+                }
+            }
+        }
+
+        // Handle uploads
         if ($request->hasFile('preview_image')) {
             $result = $this->uploadService->uploadFile($request->file('preview_image'), $folder);
             $updates['preview_image_url'] = $result['url'];
@@ -313,9 +350,13 @@ class ProjectController extends Controller
         if (!empty($updates)) {
             $project->update($updates);
             
-            // Mark granted update requests as used (delete them after successful update)
+            // Mark granted update requests as used (delete them after successful update or removal)
             foreach ($mainDocumentTypes as $docType) {
-                if ($request->hasFile($docType)) {
+                $fieldName = $docType === 'preview_image' ? 'preview_image_url' : $docType . '_url';
+                $removeFlag = 'remove_' . $docType;
+                
+                // Delete granted requests if file was uploaded or removed
+                if ($request->hasFile($docType) || ($request->has($removeFlag) && $request->input($removeFlag))) {
                     DocumentUpdateRequest::where('project_id', $project->id)
                         ->where('document_type', $docType)
                         ->where('status', DocumentUpdateRequest::STATUS_GRANTED)

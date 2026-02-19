@@ -22,7 +22,7 @@ class ProjectController extends Controller
             'milestones.escrow',
             'milestones.evidence',
             'disputes',
-            'documentUpdateRequests.requestedBy',
+            'documentUpdateRequests.requestedBy.company',
             'documentUpdateRequests.extraDocument'
         ])->findOrFail($id);
 
@@ -41,6 +41,10 @@ class ProjectController extends Controller
                         'id' => $request->requestedBy->id,
                         'name' => $request->requestedBy->name,
                         'email' => $request->requestedBy->email,
+                    ] : null,
+                    'company' => $request->requestedBy && $request->requestedBy->company ? [
+                        'id' => $request->requestedBy->company->id,
+                        'company_name' => $request->requestedBy->company->company_name,
                     ] : null,
                     'status' => $request->status,
                     'reason' => $request->reason,
