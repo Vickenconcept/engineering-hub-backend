@@ -28,9 +28,35 @@ class ProjectController extends Controller
 
         // Convert to array to ensure relationships are included
         $projectArray = $project->toArray();
+        
         // Manually add documentUpdateRequests if it exists
-        if ($project->relationLoaded('documentUpdateRequests')) {
-            $projectArray['document_update_requests'] = $project->documentUpdateRequests->toArray();
+        if ($project->relationLoaded('documentUpdateRequests') && $project->documentUpdateRequests) {
+            $projectArray['document_update_requests'] = $project->documentUpdateRequests->map(function ($request) {
+                return [
+                    'id' => $request->id,
+                    'project_id' => $request->project_id,
+                    'document_type' => $request->document_type,
+                    'extra_document_id' => $request->extra_document_id,
+                    'requested_by' => $request->requestedBy ? [
+                        'id' => $request->requestedBy->id,
+                        'name' => $request->requestedBy->name,
+                        'email' => $request->requestedBy->email,
+                    ] : null,
+                    'status' => $request->status,
+                    'reason' => $request->reason,
+                    'granted_at' => $request->granted_at?->toISOString(),
+                    'denied_at' => $request->denied_at?->toISOString(),
+                    'extra_document' => $request->extraDocument ? [
+                        'id' => $request->extraDocument->id,
+                        'title' => $request->extraDocument->title,
+                        'file_url' => $request->extraDocument->file_url,
+                    ] : null,
+                    'created_at' => $request->created_at?->toISOString(),
+                    'updated_at' => $request->updated_at?->toISOString(),
+                ];
+            })->toArray();
+        } else {
+            $projectArray['document_update_requests'] = [];
         }
         
         $project = $projectArray;
