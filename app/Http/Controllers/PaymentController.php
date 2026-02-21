@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\Consultation;
 use App\Models\Milestone;
 use App\Models\Escrow;
+use App\Models\EscrowHoldReference;
 use App\Models\PaymentAccount;
 use App\Models\User;
 use App\Services\Payment\PaymentServiceInterface;
@@ -316,7 +317,7 @@ class PaymentController extends Controller
                     'payment_reference' => $paymentData['reference'],
                 ]);
                 return $this->successResponse(
-                    $milestone->load(['project', 'escrow']),
+                    $milestone->load(['project', 'escrow', 'escrow.holdReference']),
                     'Escrow already processed.'
                 );
             }
@@ -368,11 +369,16 @@ class PaymentController extends Controller
                 'milestone_id' => $milestone->id,
             ]);
 
+            // Central hold reference: one ID to look up client, company, project, milestone
+            $milestone->load('project');
+            $escrow->setRelation('milestone', $milestone);
+            EscrowHoldReference::createForEscrow($escrow, $paymentData['reference']);
+
             // Refresh to get latest data
             $milestone->refresh();
 
             return $this->successResponse(
-                $milestone->load(['project', 'escrow']),
+                $milestone->load(['project', 'escrow', 'escrow.holdReference']),
                 'Escrow funded successfully. Milestone is now ready for work.'
             );
         }, 5); // Retry up to 5 times on deadlock

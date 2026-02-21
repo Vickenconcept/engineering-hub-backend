@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Admin;
 use App\Http\Controllers\Controller;
 use App\Models\Milestone;
 use App\Models\Escrow;
+use App\Models\EscrowHoldReference;
 use App\Models\Project;
 use App\Notifications\EscrowReleasedNotification;
 use App\Notifications\ProjectCompletedNotification;
@@ -204,6 +205,12 @@ class MilestoneController extends Controller
             // Update escrow and milestone status
             $milestone->escrow->update([
                 'status' => Escrow::STATUS_RELEASED,
+            ]);
+
+            // Update central hold reference with release transfer ref
+            EscrowHoldReference::where('escrow_id', $milestone->escrow->id)->update([
+                'status' => EscrowHoldReference::STATUS_RELEASED,
+                'paystack_transfer_reference' => $releaseData['transfer_reference'] ?? null,
             ]);
 
             $milestone->update([

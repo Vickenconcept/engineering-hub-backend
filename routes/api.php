@@ -137,6 +137,9 @@ Route::middleware(['auth:sanctum', 'throttle:60,1'])->group(function () {
         // Milestones
         Route::get('milestones', [App\Http\Controllers\Admin\MilestoneController::class, 'index']);
         Route::post('milestones/{id}/release', [App\Http\Controllers\Admin\MilestoneController::class, 'release']);
+
+        // Escrow hold reference: lookup by hold_ref (client, company, project, milestone)
+        Route::get('escrow-hold-refs/{holdRef}', [App\Http\Controllers\Admin\EscrowHoldReferenceController::class, 'show']);
         
         // Disputes
         Route::get('disputes', [App\Http\Controllers\Admin\DisputeController::class, 'index']);

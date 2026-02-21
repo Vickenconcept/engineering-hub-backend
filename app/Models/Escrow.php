@@ -6,6 +6,7 @@ use App\Helpers\MoneyFormatter;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Support\Str;
 
 class Escrow extends Model
@@ -71,6 +72,14 @@ class Escrow extends Model
     public function milestone(): BelongsTo
     {
         return $this->belongsTo(Milestone::class);
+    }
+
+    /**
+     * Central hold reference: one ID to look up client, company, project, milestone.
+     */
+    public function holdReference(): HasOne
+    {
+        return $this->hasOne(EscrowHoldReference::class);
     }
 
     /**

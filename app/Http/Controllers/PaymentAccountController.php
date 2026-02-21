@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\PaymentAccount;
 use App\Models\Escrow;
+use App\Models\EscrowHoldReference;
 use App\Models\Milestone;
 use App\Services\AuditLogService;
 use Illuminate\Http\JsonResponse;
@@ -343,6 +344,12 @@ class PaymentAccountController extends Controller
                 'status' => Escrow::STATUS_RELEASED,
             ]);
 
+            // Update central hold reference with release transfer ref
+            EscrowHoldReference::where('escrow_id', $milestone->escrow->id)->update([
+                'status' => EscrowHoldReference::STATUS_RELEASED,
+                'paystack_transfer_reference' => $releaseData['transfer_reference'] ?? null,
+            ]);
+
             $milestone->update([
                 'status' => Milestone::STATUS_RELEASED,
             ]);
@@ -508,6 +515,11 @@ class PaymentAccountController extends Controller
             // Update escrow status
             $milestone->escrow->update([
                 'status' => Escrow::STATUS_REFUNDED,
+            ]);
+
+            // Update central hold reference
+            EscrowHoldReference::where('escrow_id', $milestone->escrow->id)->update([
+                'status' => EscrowHoldReference::STATUS_REFUNDED,
             ]);
 
             // Log audit action

@@ -6,6 +6,7 @@ use App\Services\Payment\PaymentServiceInterface;
 use App\Models\Consultation;
 use App\Models\Milestone;
 use App\Models\Escrow;
+use App\Models\EscrowHoldReference;
 use App\Models\PaymentAccount;
 use App\Models\User;
 use App\Notifications\ConsultationPaidNotification;
@@ -513,6 +514,10 @@ class PaymentCallbackController extends Controller
                 'net_amount' => $netAmount,
                 'milestone_id' => $milestone->id,
             ]);
+
+            // Central hold reference: one ID to look up client, company, project, milestone
+            $escrow->setRelation('milestone', $milestone);
+            EscrowHoldReference::createForEscrow($escrow, $paymentData['reference']);
 
             Log::info('Milestone escrow payment processed', [
                 'milestone_id' => $milestoneId,
