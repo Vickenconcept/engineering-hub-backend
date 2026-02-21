@@ -53,18 +53,27 @@ class EscrowHoldReference extends Model
     }
 
     /**
+     * Generate a single hold_ref candidate (EHR- + 12 alphanumeric). No DB check.
+     * Used by generateUniqueHoldRef and by tests that assert format without DB.
+     */
+    public static function generateHoldRefCandidate(): string
+    {
+        return self::PREFIX . strtoupper(Str::random(12));
+    }
+
+    /**
      * Generate a unique hold_ref (EHR- + 12 alphanumeric).
      */
     public static function generateUniqueHoldRef(): string
     {
         $maxAttempts = 20;
         for ($i = 0; $i < $maxAttempts; $i++) {
-            $ref = self::PREFIX . strtoupper(Str::random(12));
+            $ref = self::generateHoldRefCandidate();
             if (!self::where('hold_ref', $ref)->exists()) {
                 return $ref;
             }
         }
-        return self::PREFIX . strtoupper(Str::random(12)) . substr((string) time(), -4);
+        return self::generateHoldRefCandidate() . substr((string) time(), -4);
     }
 
     /**
