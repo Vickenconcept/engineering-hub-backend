@@ -96,6 +96,56 @@ class EscrowHoldReference extends Model
         ]);
     }
 
+    /**
+     * Ensure an escrow has a hold reference (backfill for escrows created before this feature).
+     * Returns the existing or newly created EscrowHoldReference.
+     */
+    public static function ensureExistsForEscrow(Escrow $escrow): ?self
+    {
+        $existing = $escrow->holdReference()->first();
+        if ($existing) {
+            return $existing;
+        }
+
+        $escrow->loadMissing(['milestone.project']);
+        $milestone = $escrow->milestone;
+        if (!$milestone || !$milestone->project) {
+            return null;
+        }
+        $project = $milestone->project;
+
+        $status = match ($escrow->status) {
+            Escrow::STATUS_RELEASED => self::STATUS_RELEASED,
+            Escrow::STATUS_REFUNDED => self::STATUS_REFUNDED,
+            default => self::STATUS_HELD,
+        };
+
+        $paystackTransferRef = null;
+        if ($status === self::STATUS_RELEASED) {
+            $releaseLog = \App\Models\AuditLog::where('entity_type', 'escrow')
+                ->where('entity_id', $escrow->id)
+                ->where('action', 'escrow.released')
+                ->orderBy('created_at', 'desc')
+                ->first();
+            if ($releaseLog && is_array($releaseLog->metadata ?? null)) {
+                $paystackTransferRef = $releaseLog->metadata['company_transfer_reference'] ?? $releaseLog->metadata['transfer_reference'] ?? null;
+            }
+        }
+
+        $ref = self::create([
+            'escrow_id' => $escrow->id,
+            'project_id' => $project->id,
+            'milestone_id' => $milestone->id,
+            'client_id' => $project->client_id,
+            'company_id' => $project->company_id,
+            'paystack_charge_reference' => $escrow->payment_reference,
+            'paystack_transfer_reference' => $paystackTransferRef,
+            'status' => $status,
+        ]);
+
+        return $ref;
+    }
+
     public function escrow(): BelongsTo
     {
         return $this->belongsTo(Escrow::class);

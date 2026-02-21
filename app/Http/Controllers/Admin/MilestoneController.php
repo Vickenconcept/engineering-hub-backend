@@ -35,7 +35,17 @@ class MilestoneController extends Controller
         
         $milestones = $query->orderBy('created_at', 'desc')
             ->paginate($perPage);
-        
+
+        // Backfill hold reference for escrows created before the feature (so Reference ID always shows)
+        foreach ($milestones->items() as $milestone) {
+            if ($milestone->escrow && !$milestone->escrow->holdReference) {
+                $ref = EscrowHoldReference::ensureExistsForEscrow($milestone->escrow);
+                if ($ref) {
+                    $milestone->escrow->setRelation('holdReference', $ref);
+                }
+            }
+        }
+
         return $this->paginatedResponse($milestones, 'Milestones with escrow retrieved successfully.');
     }
     
