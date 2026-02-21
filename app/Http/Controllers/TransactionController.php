@@ -127,7 +127,7 @@ class TransactionController extends Controller
                         ? $releaseLog->metadata['platform_fee_transfer_reference'] 
                         : null;
 
-                    // COMPANY: Shows net amount they received (after platform fee)
+                    // COMPANY or ADMIN: One release row — net amount to company (admin sees this as the release record)
                     if ($user->isAdmin() || ($user->isCompany() && $project->company_id === ($user->company->id ?? null))) {
                         $transactions->push([
                             'id' => $escrow->id . '_release',
@@ -165,8 +165,8 @@ class TransactionController extends Controller
                         ]);
                     }
 
-                    // CLIENT: Shows full amount (they paid it, then it was released)
-                    if ($user->isAdmin() || ($user->isClient() && $project->client_id === $user->id)) {
+                    // CLIENT only: Shows full amount (their escrow that was released to company) — not shown to admin to avoid duplicate
+                    if ($user->isClient() && $project->client_id === $user->id) {
                         $transactions->push([
                             'id' => $escrow->id . '_release_client',
                             'type' => 'escrow_release',
