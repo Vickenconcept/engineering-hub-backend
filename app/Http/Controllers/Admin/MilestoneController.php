@@ -24,7 +24,7 @@ class MilestoneController extends Controller
         $perPage = $request->input('per_page', 15);
         $status = $request->input('status', 'held'); // held, released, all
         
-        $query = Milestone::with(['project', 'escrow', 'project.company.user', 'project.client'])
+        $query = Milestone::with(['project', 'escrow.holdReference', 'project.company.user', 'project.client'])
             ->whereHas('escrow');
         
         if ($status !== 'all') {

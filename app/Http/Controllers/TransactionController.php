@@ -35,7 +35,8 @@ class TransactionController extends Controller
         if (!$type || $type === 'all' || $type === 'escrow') {
             $escrowQuery = Escrow::with([
                 'milestone.project.client',
-                'milestone.project.company.user'
+                'milestone.project.company.user',
+                'holdReference',
             ]);
 
             // Filter by user role
@@ -76,6 +77,7 @@ class TransactionController extends Controller
                         'amount' => MoneyFormatter::format($escrow->amount),
                         'status' => 'success',
                         'payment_reference' => $escrow->payment_reference,
+                        'hold_ref' => $escrow->holdReference?->hold_ref,
                         'description' => "Escrow deposit for milestone: {$escrow->milestone->title}",
                         'entity_type' => 'escrow',
                         'entity_id' => $escrow->id,
@@ -133,6 +135,7 @@ class TransactionController extends Controller
                             'amount' => MoneyFormatter::format($netAmount),
                             'status' => 'success',
                             'payment_reference' => $companyTransferRef,
+                            'hold_ref' => $escrow->holdReference?->hold_ref,
                             'description' => "Escrow released for milestone: {$escrow->milestone->title}" . ($platformFee > 0 ? " (₦" . MoneyFormatter::format($platformFee) . " platform fee deducted)" : ''),
                             'entity_type' => 'escrow',
                             'entity_id' => $escrow->id,
@@ -170,6 +173,7 @@ class TransactionController extends Controller
                             'amount' => MoneyFormatter::format($totalAmount),
                             'status' => 'success',
                             'payment_reference' => $companyTransferRef,
+                            'hold_ref' => $escrow->holdReference?->hold_ref,
                             'description' => "Escrow released to company for milestone: {$escrow->milestone->title}",
                             'entity_type' => 'escrow',
                             'entity_id' => $escrow->id,
@@ -207,6 +211,7 @@ class TransactionController extends Controller
                             'amount' => MoneyFormatter::format($platformFee),
                             'status' => 'success',
                             'payment_reference' => $platformFeeTransferRef,
+                            'hold_ref' => $escrow->holdReference?->hold_ref,
                             'description' => "Platform fee from escrow release" . ($project->company ? ": {$project->company->company_name}" : '') . ($project->client ? " (Client: {$project->client->name})" : '') . " - Milestone: {$escrow->milestone->title}",
                             'entity_type' => 'escrow',
                             'entity_id' => $escrow->id,
@@ -256,6 +261,7 @@ class TransactionController extends Controller
                             'payment_reference' => $refundLog && isset($refundLog->metadata['refund_reference']) 
                                 ? $refundLog->metadata['refund_reference'] 
                                 : ($escrow->payment_reference ?? null),
+                            'hold_ref' => $escrow->holdReference?->hold_ref,
                             'description' => "Escrow refunded for milestone: {$escrow->milestone->title}",
                             'entity_type' => 'escrow',
                             'entity_id' => $escrow->id,
@@ -292,6 +298,7 @@ class TransactionController extends Controller
                             'payment_reference' => $refundLog && isset($refundLog->metadata['refund_reference']) 
                                 ? $refundLog->metadata['refund_reference'] 
                                 : ($escrow->payment_reference ?? null),
+                            'hold_ref' => $escrow->holdReference?->hold_ref,
                             'description' => "Escrow refunded to client for milestone: {$escrow->milestone->title}",
                             'entity_type' => 'escrow',
                             'entity_id' => $escrow->id,
